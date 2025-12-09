@@ -3,11 +3,8 @@ package com.vsuscheduleweb.Exceptions.ExcpetionHandlers;
 
 
 
+import com.vsuscheduleweb.Exceptions.*;
 import com.vsuscheduleweb.Exceptions.Errors.AppError;
-import com.vsuscheduleweb.Exceptions.ObjectIsPresentException;
-import com.vsuscheduleweb.Exceptions.ResponseNotFoundException;
-import com.vsuscheduleweb.Exceptions.TokenException;
-import com.vsuscheduleweb.parser.ParserException;
 import io.jsonwebtoken.ExpiredJwtException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -19,31 +16,43 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 @Slf4j
 @ControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler
-    public ResponseEntity<AppError> responseNotFoundExceptionHandler(ResponseNotFoundException e){
-        log.info(e.getMessage());
-        return new ResponseEntity<AppError>(new AppError(HttpStatus.NOT_FOUND.value(), e.getMessage()), HttpStatus.NOT_FOUND);
+
+    @ExceptionHandler({
+            ResponseNotFoundException.class,
+            GroupNotFoundException.class,
+            TeacherNotFoundException.class
+    })
+    public ResponseEntity<AppError> notFoundExceptionHandler(RuntimeException ex){
+        log.error(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new AppError(ex.getMessage()));
     }
 
     @ExceptionHandler
-    public ResponseEntity<AppError> ObjectIsPresentExceptionHandler(ObjectIsPresentException e){
-        log.info(e.getMessage());
-        return new ResponseEntity<AppError>(new AppError(HttpStatus.NOT_FOUND.value(),e.getMessage()),HttpStatus.CONFLICT);
+    public ResponseEntity<AppError> ObjectIsPresentExceptionHandler(ObjectIsPresentException ex){
+        log.error(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new AppError(ex.getMessage()));
     }
 
-    @ExceptionHandler
-    public ResponseEntity<AppError> noAuthExceptionHandler(ExpiredJwtException e){
-        log.info(e.getMessage());
-        return new ResponseEntity<AppError>(new AppError(HttpStatus.FORBIDDEN.value(), e.getMessage()),HttpStatus.FORBIDDEN);
+    @ExceptionHandler({
+            TokenException.class,
+            ExpiredJwtException.class
+    })
+    public ResponseEntity<AppError> authExceptionHandler(RuntimeException ex){
+        log.error(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new AppError(ex.getMessage()));
     }
 
-    @ExceptionHandler
-    public ResponseEntity<AppError> tokenExceptionHandler(TokenException e){
-        log.info(e.getMessage());
-        return new ResponseEntity<AppError>(new AppError(HttpStatus.FORBIDDEN.value(), e.getMessage()),HttpStatus.FORBIDDEN);
-
+    @ExceptionHandler({
+            FileIsEmptyException.class,
+            FileException.class,
+            ParserException.class
+    })
+    public ResponseEntity<AppError> fileFormatExceptionHandler(RuntimeException ex){
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new AppError(ex.getMessage()));
     }
-
-
 
 }

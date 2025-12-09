@@ -1,20 +1,11 @@
 package com.vsuscheduleweb.Controllers;
 
-import com.vsuscheduleweb.entity.Group;
-import com.vsuscheduleweb.entity.Lesson;
-import com.vsuscheduleweb.entity.Subgroup;
-import com.vsuscheduleweb.entity.Teacher;
-import com.vsuscheduleweb.repositories.GroupRepository;
-import com.vsuscheduleweb.repositories.TeacherRepository;
+import com.vsuscheduleweb.DTO.GroupResponse;
+import com.vsuscheduleweb.DTO.ListGroupResponse;
+import com.vsuscheduleweb.services.GroupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.springframework.web.bind.annotation.*;
 
 
 @RequiredArgsConstructor
@@ -22,13 +13,17 @@ import java.util.List;
 @RestController()
 public class GroupController {
 
-    private final GroupRepository groupRepository;
+    private final GroupService groupService;
 
-    @GetMapping()
-    public ResponseEntity<List<Group>> getTeachers(){
-        List<Group> groups = groupRepository.findAll();
-
-        return new ResponseEntity<>(groups, HttpStatus.OK);
+    @GetMapping
+    @ResponseStatus(HttpStatus.OK)
+    public ListGroupResponse getAll() {
+        return groupService.getAll();
     }
 
+    @GetMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    public GroupResponse getById(@PathVariable String id) {
+        return groupService.getById(id);
+    }
 }

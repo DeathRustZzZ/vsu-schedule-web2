@@ -18,13 +18,16 @@ repositories {
 	mavenCentral()
 }
 
+ext {
+	set('modelMapperVersion',  "3.2.0")
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.flywaydb:flyway-core'
-	implementation 'org.mapstruct:mapstruct:1.5.3.Final'
 	testImplementation 'junit:junit:4.13.1'
-	annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.3.Final'
+	implementation "org.modelmapper:modelmapper:${modelMapperVersion}"
 	implementation group: 'org.springframework.boot', name: 'spring-boot-starter-security', version: '3.0.2'
 	runtimeOnly group: 'io.jsonwebtoken', name: 'jjwt-impl', version: '0.11.5'
 	implementation group: 'io.jsonwebtoken', name: 'jjwt-api', version: '0.11.5'
@@ -32,14 +35,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf:3.0.5'
 	implementation 'org.apache.poi:poi:3.12'
 	compileOnly 'org.projectlombok:lombok'
-	compileOnly "org.mapstruct:mapstruct:1.5.3.Final"
 	implementation 'org.apache.poi:poi-ooxml:3.12'
 	runtimeOnly 'org.postgresql:postgresql'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-
 	implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.0'
-
 }
 
 tasks.named('test') {

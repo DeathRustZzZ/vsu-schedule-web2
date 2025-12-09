@@ -1,5 +1,6 @@
 package com.vsuscheduleweb.parser;
 
+import com.vsuscheduleweb.Exceptions.ParserException;
 import lombok.NoArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -103,7 +104,7 @@ public  class Parser {
                 .replace(".",":");
     }
 
-    private  HashMap<Integer,Subgroup> parseGroups(List<Cell> workspace, String facult) throws ParserException{
+    private  HashMap<Integer,Subgroup> parseGroups(List<Cell> workspace, String facult) throws ParserException {
         HashMap<Integer,Subgroup> map = new HashMap<>();
         Queue<Group> queue = new ArrayDeque<>();
         Queue<Group> queueCache = new ArrayDeque<>();

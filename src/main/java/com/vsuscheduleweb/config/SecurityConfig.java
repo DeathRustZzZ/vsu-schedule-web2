@@ -24,7 +24,6 @@ public class SecurityConfig {
          httpSecurity
                  .csrf()
                  .disable()
-
                  .authorizeHttpRequests()
                  .requestMatchers("/rest/auth/register").permitAll()
                  .requestMatchers("/rest/auth/authenticate").permitAll()
@@ -34,7 +33,6 @@ public class SecurityConfig {
                  .requestMatchers("/css/**","/js/**","/img/**").permitAll()
                  .requestMatchers("/vsuAdmin").authenticated()
                  .requestMatchers("/rest/auth/logout").permitAll()
-
                  .anyRequest().authenticated()
                  .and().formLogin(form->{
                      form.loginPage("/login")

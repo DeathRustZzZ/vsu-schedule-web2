@@ -99,10 +99,6 @@ public class AppConfig {
             );
             log.info("[+] teachers have been saved!");
 
-
-
-
-
         };
     }
 }

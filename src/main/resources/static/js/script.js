@@ -35,8 +35,8 @@ btn.onclick = function() {
 
     console.log(password.value);
     var raw = JSON.stringify({
-      "password": password.value + "",
-      "login": email.value + ""
+      "login": email.value + "",
+      "password": password.value + ""
     });
 
     var requestOptions = {

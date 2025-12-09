@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.UUID;
 
 
-//одно занятие с его временем, аудиторией и датой
 @Data
 @Accessors(chain = true)
 @ToString

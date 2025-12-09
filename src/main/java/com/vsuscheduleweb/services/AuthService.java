@@ -51,22 +51,19 @@ public class AuthService {
                 .setLastname(userDto.getLastname());
         var savedUser = userRepository.save(user);
         var jwtToken = jwtService.generateToken(user);
-
         saveUserToken(savedUser, jwtToken);
         return new AuthResponse().setToken(jwtToken);
 
 
     }
     private Token saveUserToken(AppUser user, String jwtToken) {
-        System.out.println(jwtToken);
         var token = new Token()
                 .setId(UUID.randomUUID() )
                 .setUser(user)
                 .setToken(jwtToken)
                 .setTokenType(TokenType.BEARER)
                 .setExpired(false)
-                .setRevoked(false)
-                ;
+                .setRevoked(false);
         tokenRepository.save(token);
         return token;
     }
