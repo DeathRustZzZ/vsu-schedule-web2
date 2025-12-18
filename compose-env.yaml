@@ -1,6 +1,6 @@
 version: '3'
 services:
-  db-booking-api:
+  db-schedule:
     image: postgres
     ports:
       - 5444:5432

@@ -45,9 +45,6 @@ public class ScheduleService {
 
     private final LessonRepository lessonRepository;
 
-    private final GroupMapper groupMapper;
-
-
     public void uploadSchedule(MultipartFile multipartFile, String facult) {
         lessonRepository.deleteAllWhereFacultEquals(facult);
         File file = saveFile(multipartFile,facult);
@@ -105,6 +102,7 @@ public class ScheduleService {
 
     private void processGroups(List<Group> groups){
         for (Group group : groups) {
+            group.setId(group.getId().replace('/','.'));
             for (int j = 0; j < group.getCommonLessons().size(); j++) {
                 Lesson lesson = group.getCommonLessons().get(j);
                 lesson.setGroupId(group.getId());

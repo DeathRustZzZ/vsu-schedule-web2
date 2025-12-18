@@ -25,8 +25,7 @@ public class SecurityConfig {
                  .csrf()
                  .disable()
                  .authorizeHttpRequests()
-                 .requestMatchers("/rest/auth/register").permitAll()
-                 .requestMatchers("/rest/auth/authenticate").permitAll()
+                 .requestMatchers("/rest/auth/**").permitAll()
                  .requestMatchers("/rest/teachers").permitAll()
                  .requestMatchers("/rest/groups").permitAll()
                  .requestMatchers("/").authenticated()
@@ -40,7 +39,6 @@ public class SecurityConfig {
                              .loginProcessingUrl("/login")
                              .permitAll();
                  })
-
                  .sessionManagement()
                  .sessionCreationPolicy(SessionCreationPolicy.ALWAYS)
                  .and()

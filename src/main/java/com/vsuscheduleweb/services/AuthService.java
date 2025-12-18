@@ -92,7 +92,6 @@ public class AuthService {
         }else {
             var jwtToken = jwtService.generateToken(opt_user.get());
             var token = saveUserToken(opt_user.get(), jwtToken);
-
             opt_user.get().addToken(token);
             userRepository.save(opt_user.get());
             return new AuthResponse().setToken(jwtToken);
