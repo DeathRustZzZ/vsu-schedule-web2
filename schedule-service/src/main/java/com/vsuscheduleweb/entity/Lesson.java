@@ -49,6 +49,4 @@ public class Lesson {
 
     private String facult;
 
-
-
 }
