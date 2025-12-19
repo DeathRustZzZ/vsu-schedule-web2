@@ -58,18 +58,15 @@ public class AppConfig {
     @Bean
     public CommandLineRunner teacherLoader(TeacherRepository teacherRepository){
         return args ->{
-            String pathTeachersDir = System.getProperty("user.dir") + "\\src\\main\\scriptspython\\teachers";
-            Process p =  Runtime.getRuntime().exec("python " + System.getProperty("user.dir") + "\\src\\main\\scriptspython\\teacherParser.py");
+            String pathTeachersDir = System.getProperty("user.dir") + "\\schedule-service\\src\\main\\scriptspython\\teachers";
+            Process p =  Runtime.getRuntime().exec("python " + System.getProperty("user.dir") + "\\schedule-service\\src\\main\\scriptspython\\teacherParser.py");
             InputStream stdout = p.getInputStream();
             InputStream stderr = p.getErrorStream();
             InputStreamReader isr = new InputStreamReader(stdout);
             InputStreamReader isrerr = new InputStreamReader(stderr);
             BufferedReader br = new BufferedReader(isr);
             BufferedReader brerr = new BufferedReader(isrerr);
-
             String line = null;
-
-
             while ((line = br.readLine()) != null)
                 if(line.equals("1")){
                     log.info("[+] teachers have been parsed!");

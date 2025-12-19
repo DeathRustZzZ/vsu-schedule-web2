@@ -1,0 +1,55 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-bot-user
+      author: Alexey
+      preConditions:
+        - onFail: MARK_RAN
+          or:
+            - not:
+                tableExists:
+                  tableName: students
+      changes:
+        - createTable:
+            tableName: students
+            columns:
+              - column:
+                  name: student-id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: telegram-user-id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: chat-id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: username
+                  type: varchar(150)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: faculty
+                  type: varchar(150)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: group-id
+                  type: varchar(150)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: subgroup-id
+                  type: varchar(150)
+                  constraints:
+                    nullable: true
+
+      rollback:
+        - dropTable:
+            tableName: passengers

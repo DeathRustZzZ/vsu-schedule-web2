@@ -1,7 +1,14 @@
 server:
   port: 9898
+
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5444/vsu-schedule-db
+    url: jdbc:postgresql://localhost:5432/schedule-db
     username: admin
     password: admin
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+  application:
+    name: schedule-service

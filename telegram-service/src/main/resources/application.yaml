@@ -1,0 +1,23 @@
+server:
+  port: 9899
+
+spring:
+  application:
+    name: telegram-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/telegram-service-db
+    username: admin
+    password: admin
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+
+  liquibase:
+    enabled: true
+    change-log: classpath:/db/changelog/db.changelog-master.xml
+
+bot:
+  name: "@vsuvsubot"
+  path: https://hg5eqt-37-212-27-74.ru.tuna.am
+  token: 8019302937:AAFlJwTThl-Ucv5cydJj2o9FQH2dvxPT2n0
