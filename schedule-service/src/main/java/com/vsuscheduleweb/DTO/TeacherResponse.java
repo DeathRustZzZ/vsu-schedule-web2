@@ -11,7 +11,6 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @Accessors(chain = true)
 public class TeacherResponse {
     private Integer id;

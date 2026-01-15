@@ -21,6 +21,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.io.*;
+import java.nio.file.Paths;
 import java.util.Optional;
 
 @Configuration
@@ -56,37 +57,8 @@ public class AppConfig {
     }
 
     @Bean
-    public CommandLineRunner teacherLoader(TeacherRepository teacherRepository){
+    public CommandLineRunner loadTeachers(TeacherRepository teacherRepository){
         return args ->{
-            String pathTeachersDir = System.getProperty("user.dir") + "\\schedule-service\\src\\main\\scriptspython\\teachers";
-            Process p =  Runtime.getRuntime().exec("python " + System.getProperty("user.dir") + "\\schedule-service\\src\\main\\scriptspython\\teacherParser.py");
-            InputStream stdout = p.getInputStream();
-            InputStream stderr = p.getErrorStream();
-            InputStreamReader isr = new InputStreamReader(stdout);
-            InputStreamReader isrerr = new InputStreamReader(stderr);
-            BufferedReader br = new BufferedReader(isr);
-            BufferedReader brerr = new BufferedReader(isrerr);
-            String line = null;
-            while ((line = br.readLine()) != null)
-                if(line.equals("1")){
-                    log.info("[+] teachers have been parsed!");
-                    p.destroyForcibly();
-                }
-
-            while ((line = brerr.readLine()) != null)
-                if(!line.isEmpty()) log.error("[-] Error teachers have not been parsed!" + "\n" + line );
-
-
-            File dir = new File(pathTeachersDir);
-            File[] arrFiles = dir.listFiles();
-            ObjectMapper objectMapper = new ObjectMapper();
-            for(File file : arrFiles){
-                Teacher teacher = objectMapper.readValue(file, Teacher.class);
-                Optional<Teacher> opt_teacher = teacherRepository.findById(teacher.getId());
-                if(!opt_teacher.isPresent())
-                    teacherRepository.save(teacher);
-
-            }
             teacherRepository.save(new Teacher() //empty teacher opt.
                     .setId(-1)
                     .setFirstname("")
@@ -94,8 +66,6 @@ public class AppConfig {
                     .setSurname("")
                     .setInitials("")
             );
-            log.info("[+] teachers have been saved!");
-
         };
     }
 }

@@ -3,7 +3,7 @@ package com.vsuscheduleweb.Controllers;
 import com.vsuscheduleweb.DTO.AppUserDto;
 import com.vsuscheduleweb.services.AuthService;
 import com.vsuscheduleweb.DTO.AuthResponse;
-import com.vsuscheduleweb.DTO.AuthReqDto;
+import com.vsuscheduleweb.DTO.AuthRequest;
 import com.vsuscheduleweb.services.LogoutService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -28,7 +28,7 @@ public class AuthController {
         return new ResponseEntity<>(authService.register(req), HttpStatus.OK);
     }
     @PostMapping("/authenticate")
-    public ResponseEntity<AuthResponse> auth(@RequestBody AuthReqDto req){
+    public ResponseEntity<AuthResponse> auth(@RequestBody AuthRequest req){
         return new ResponseEntity<>(authService.auth(req), HttpStatus.OK);
     }
 

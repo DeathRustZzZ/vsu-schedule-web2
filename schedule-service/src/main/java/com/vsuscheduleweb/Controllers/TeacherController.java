@@ -3,6 +3,7 @@ package com.vsuscheduleweb.Controllers;
 
 import com.vsuscheduleweb.DTO.ListTeacherResponse;
 import com.vsuscheduleweb.DTO.TeacherResponse;
+import com.vsuscheduleweb.services.TeacherParserService;
 import com.vsuscheduleweb.services.TeacherService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,8 @@ public class TeacherController {
 
     private final TeacherService teacherService;
 
+    private final TeacherParserService teacherParserService;
+
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     public ListTeacherResponse getTeachers() {
@@ -28,6 +31,12 @@ public class TeacherController {
     @ResponseStatus(HttpStatus.OK)
     public TeacherResponse getById(@PathVariable UUID id) {
         return teacherService.getById(id);
+    }
+
+    @GetMapping("/parse")
+    @ResponseStatus(HttpStatus.OK)
+    public ListTeacherResponse parseTeachers() {
+        return teacherParserService.parseTeachers();
     }
 
 }

@@ -10,8 +10,9 @@ import java.util.UUID;
 @Repository
 public interface TeacherRepository extends JpaRepository<Teacher,UUID> {
 
-    public Optional<Teacher> findByInitialsAndLastname(String initials, String lastname);
-    public Teacher findByLastname(String lastname);
+    Optional<Teacher> findByInitialsAndLastname(String initials, String lastname);
+    Teacher findByLastname(String lastname);
+    Boolean existsById(Integer id);
 
     Optional<Teacher> findById(Integer id);
 

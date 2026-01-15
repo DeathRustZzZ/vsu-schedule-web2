@@ -13,7 +13,6 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @Accessors(chain = true)
 public class GroupResponse {
     private String id;

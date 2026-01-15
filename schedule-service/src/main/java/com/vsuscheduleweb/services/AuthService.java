@@ -2,7 +2,7 @@ package com.vsuscheduleweb.services;
 
 
 import com.vsuscheduleweb.DTO.AppUserDto;
-import com.vsuscheduleweb.DTO.AuthReqDto;
+import com.vsuscheduleweb.DTO.AuthRequest;
 import com.vsuscheduleweb.DTO.AuthResponse;
 import com.vsuscheduleweb.Exceptions.ObjectIsPresentException;
 import com.vsuscheduleweb.Exceptions.ResponseNotFoundException;
@@ -79,7 +79,7 @@ public class AuthService {
         tokenRepository.saveAll(validUserTokens);
     }
 
-    public AuthResponse auth(AuthReqDto req){
+    public AuthResponse auth(AuthRequest req){
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         req.getLogin(),
