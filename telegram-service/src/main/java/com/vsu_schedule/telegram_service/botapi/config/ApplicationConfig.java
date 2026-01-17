@@ -6,7 +6,10 @@ import com.vsu_schedule.telegram_service.botapi.TelegramFacade;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.telegram.telegrambots.bots.DefaultAbsSender;
+import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.meta.api.methods.updates.SetWebhook;
+import org.telegram.telegrambots.meta.bots.AbsSender;
 
 @Configuration
 @RequiredArgsConstructor
@@ -29,4 +32,6 @@ public class ApplicationConfig {
                 scheduleBotConfig.getBotPath()
         );
     }
+
+
 }

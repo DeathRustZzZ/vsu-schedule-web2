@@ -6,4 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface BotUserRepository extends JpaRepository<BotUser, Long> {
     BotUser findByTelegramId(Long telegramId);
     Boolean existsByTelegramId(Long telegramId);
+    void deleteByTelegramId(Long telegramId);
 }

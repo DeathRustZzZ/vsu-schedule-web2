@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -68,6 +69,16 @@ public class ScheduleBot extends SpringWebhookBot {
             log.error(e.getMessage());
         }
     }
+
+    @EventListener
+    public void onApplicationEvent(TelegramActionEvent event) {
+        try {
+            this.execute(event.getMethod());
+        } catch (TelegramApiException e) {
+            log.error( e.getMessage());
+        }
+    }
+
 
     @Override
     public String getBotUsername() {

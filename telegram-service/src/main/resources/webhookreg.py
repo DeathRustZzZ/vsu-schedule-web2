@@ -12,11 +12,13 @@ def getLinkAndToken():
             if 'path' in line or 'token' in line:
 
                 paramlist.append(str(line.strip(" ").split(" ")[1]))
-
+    print(paramlist)
     paramlist.pop(0)
+
     return paramlist
 
 def regTelegramWebHook(linkFromNgrok,token):
+    print(linkFromNgrok)
     link = "https://api.telegram.org/bot"+token+"/setwebhook?url="+linkFromNgrok.strip()+"/bots/index.php"
     response = requests.get(link)
     valueslist = []
@@ -36,8 +38,9 @@ def main():
     linkAndToken = getLinkAndToken()
     link = 0
     token = 0
+    print(linkAndToken)
     for item in linkAndToken:
-        if 'https' in item:
+        if 'http' in item:
             link = item
         else:
             token = item

@@ -2,6 +2,7 @@ package com.vsu_schedule.telegram_service.botapi.service;
 
 
 import com.vsu_schedule.telegram_service.botapi.callback_query_types.FacultyCallbackQueryTypes;
+import com.vsu_schedule.telegram_service.botapi.callback_query_types.ResetRegistrationCallbackQueryTypes;
 import com.vsu_schedule.telegram_service.botapi.command.HelpCommand;
 import com.vsu_schedule.telegram_service.botapi.command.RegisterCommand;
 import com.vsu_schedule.telegram_service.botapi.command.StartCommand;
@@ -12,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -52,8 +54,10 @@ public class BotMessageCommandService {
                     .setUsername(message.getFrom().getUserName()));
             sendMessage.setText(new RegisterCommand().getAnswer(message));
             sendMessage.setReplyMarkup(getFacultiesInlineKeyboard());
+
         }else {
-            sendMessage.setText("Вы уже были зарегистрированы.");
+            sendMessage.setReplyMarkup(getAnswersResetRegistrationInlineKeyBoard());
+            sendMessage.setText("Вы уже были зарегистрированы. Хотите пройти регистрацию заново?");
         }
         return sendMessage;
     }
@@ -71,5 +75,22 @@ public class BotMessageCommandService {
                 .keyboardRow(buttonList)
                 .build();
 
+    }
+    private InlineKeyboardMarkup getAnswersResetRegistrationInlineKeyBoard() {
+        List<InlineKeyboardButton> buttonList = new ArrayList<>();
+        Collections.addAll(buttonList,
+                InlineKeyboardButton.builder()
+                        .callbackData(ResetRegistrationCallbackQueryTypes.YES.toString())
+                        .text("Да")
+                        .build(),
+                InlineKeyboardButton.builder()
+                        .callbackData(ResetRegistrationCallbackQueryTypes.NO.toString())
+                        .text("Нет")
+                        .build()
+        );
+        return InlineKeyboardMarkup
+                .builder()
+                .keyboardRow(buttonList)
+                .build();
     }
 }
