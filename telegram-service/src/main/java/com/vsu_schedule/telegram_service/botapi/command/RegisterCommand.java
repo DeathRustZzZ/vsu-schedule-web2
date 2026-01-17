@@ -14,7 +14,7 @@ public class RegisterCommand extends BotCommand implements Command {
     }
 
     public String getAnswer(Message message) {
-        return "";
+        return "Выберете свой факультет";
     }
 
     public static String getCommandName() {

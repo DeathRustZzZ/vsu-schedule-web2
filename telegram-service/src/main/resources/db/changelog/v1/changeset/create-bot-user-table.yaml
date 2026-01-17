@@ -7,15 +7,14 @@ databaseChangeLog:
           or:
             - not:
                 tableExists:
-                  tableName: students
+                  tableName: bot-users
       changes:
         - createTable:
-            tableName: students
+            tableName: bot-users
             columns:
               - column:
-                  name: student-id
-                  type: bigint
-                  autoIncrement: true
+                  name: user-id
+                  type: UUID
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -32,23 +31,20 @@ databaseChangeLog:
               - column:
                   name: username
                   type: varchar(150)
-                  constraints:
-                    nullable: false
               - column:
                   name: faculty
                   type: varchar(150)
-                  constraints:
-                    nullable: false
               - column:
                   name: group-id
                   type: varchar(150)
-                  constraints:
-                    nullable: false
               - column:
                   name: subgroup-id
                   type: varchar(150)
+              - column:
+                  name: bot-state
+                  type: varchar(150)
                   constraints:
-                    nullable: true
+                    nullable: false
 
       rollback:
         - dropTable:

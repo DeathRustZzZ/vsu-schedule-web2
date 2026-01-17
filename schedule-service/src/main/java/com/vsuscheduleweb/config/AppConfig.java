@@ -1,8 +1,6 @@
 package com.vsuscheduleweb.config;
 
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import com.vsuscheduleweb.entity.Teacher;
 import com.vsuscheduleweb.repositories.AppUserRepository;
 import com.vsuscheduleweb.repositories.TeacherRepository;
@@ -19,10 +17,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
 import java.io.*;
-import java.nio.file.Paths;
-import java.util.Optional;
+
 
 @Configuration
 @RequiredArgsConstructor
@@ -59,13 +55,15 @@ public class AppConfig {
     @Bean
     public CommandLineRunner loadTeachers(TeacherRepository teacherRepository){
         return args ->{
-            teacherRepository.save(new Teacher() //empty teacher opt.
-                    .setId(-1)
-                    .setFirstname("")
-                    .setLastname("")
-                    .setSurname("")
-                    .setInitials("")
-            );
+            if(!teacherRepository.existsById(-1)) {
+                teacherRepository.save(new Teacher() //empty teacher
+                        .setId(-1)
+                        .setFirstname("")
+                        .setLastname("")
+                        .setSurname("")
+                        .setInitials("")
+                );
+            }
         };
     }
 }

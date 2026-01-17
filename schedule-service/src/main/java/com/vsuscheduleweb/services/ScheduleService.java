@@ -14,14 +14,13 @@ import com.vsuscheduleweb.repositories.TeacherRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
-
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.util.List;
 import java.io.*;
 import java.util.Locale;
 import java.util.Optional;
+
 
 @Service
 @RequiredArgsConstructor
@@ -72,7 +71,8 @@ public class ScheduleService {
     private void processTeachers(List<Teacher> teachers) {
         teachers.forEach(teacher -> {
             try {
-                Optional<Teacher> opt_teacher = teacherRepository.findByInitialsAndLastname(teacher.getInitials(), teacher.getLastname().toUpperCase(Locale.ROOT));
+                Optional<Teacher> opt_teacher = teacherRepository.findByInitialsAndLastname(teacher.getInitials(),
+                        teacher.getLastname().toUpperCase(Locale.ROOT));
                 if (opt_teacher.isPresent()) {
                     Teacher teacherDb = opt_teacher.get();
                     teacher.getLessons().forEach(lesson -> {
