@@ -29,6 +29,7 @@ public  class Parser {
             teachers.get(i).getLessons().removeIf(lesson -> lesson.getName().equals(""));
         }
         return teachers;
+
     }
 
     public List<Group> getGroups() {
