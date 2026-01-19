@@ -8,11 +8,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 
 @Controller
-@RequestMapping()
+@RequestMapping("/schedule")
 public class AdminController {
 
 
-    @GetMapping(value = "/vsuAdmin")
+    @GetMapping(value = "/admin")
     public String getAdminPage(){
         return "vsuAdminApp";
     }

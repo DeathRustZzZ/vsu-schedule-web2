@@ -19,10 +19,10 @@ function loginWithLocalStorage(){
                             headers: head,
                             redirect: 'follow'
                           };
-                          fetch("http://127.0.0.1:9898/vsuAdmin", requestOptions)
+                          fetch("http://127.0.0.1:9898/schedule/admin", requestOptions)
                             .then(response => response.text())
                             .then(data => {
-                                    window.location.href = "/vsuAdmin"
+                                    window.location.href = "/schedule/admin"
                                     }
                                 )
 
@@ -48,7 +48,7 @@ btn.onclick = function() {
 
 
 
-    fetch("http://127.0.0.1:9898/rest/auth/authenticate", requestOptions)
+    fetch("http://127.0.0.1:9898/schedule/auth", requestOptions)
       .then(response => response.json())
       .then(data => {
       console.log(data.token)

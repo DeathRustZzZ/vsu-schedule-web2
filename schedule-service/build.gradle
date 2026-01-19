@@ -1,7 +1,7 @@
 plugins {
-	id 'java'
-	id 'org.springframework.boot' version '3.0.5'
-	id 'io.spring.dependency-management' version '1.1.0'
+    id 'org.springframework.boot' version '3.0.5'
+    id 'io.spring.dependency-management' version '1.1.0'
+    id 'java'
 }
 
 group = 'com.vsu-schedule-web'
@@ -21,6 +21,7 @@ repositories {
 ext {
 	set('modelMapperVersion',  "3.2.0")
 }
+
 
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -42,6 +43,9 @@ dependencies {
 	implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.0'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.jsoup:jsoup:1.17.2'
+    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.0.3")
+    // Source: https://mvnrepository.com/artifact/org.springframework.cloud/spring-cloud-starter-openfeign
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.0.3")
 }
 
 tasks.named('test') {

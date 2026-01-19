@@ -11,12 +11,13 @@ import com.vsu_schedule.telegram_service.repository.BotUserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
+import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
-import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,36 +31,30 @@ public class BotMessageCommandService {
     private final BotUserRepository botUserRepository;
 
     public BotApiMethod<?> handleStartCommand(Message message){
-        log.info("sadasdsadasdadad");
-        SendMessage sendMessage = new SendMessage();
-        sendMessage.setChatId(message.getChatId());
-        sendMessage.setText(new StartCommand().getAnswer(message));
-        return sendMessage;
+        String chatId = message.getChatId().toString();
+        return new SendMessage(chatId,new StartCommand().getAnswer(message));
     }
 
     public BotApiMethod<?> handleHelpCommand(Message message) {
-        SendMessage sendMessage = new SendMessage();
-        sendMessage.setChatId(message.getChatId());
-        sendMessage.setText(new HelpCommand().getAnswer(message));
-        return sendMessage;
+        return new SendMessage(message.getChatId().toString(),new HelpCommand().getAnswer(message));
     }
 
     public BotApiMethod<?> handleRegisterCommand(Message message){
-        SendMessage sendMessage = new SendMessage();
-        sendMessage.setChatId(message.getChatId());
+        String chatId = message.getChatId().toString();
         if(!botUserRepository.existsByTelegramId(message.getFrom().getId())){
             botUserRepository.save(new BotUser()
                     .setTelegramId(message.getFrom().getId())
                     .setChatId(message.getChatId())
                     .setUsername(message.getFrom().getUserName()));
-            sendMessage.setText(new RegisterCommand().getAnswer(message));
+            SendMessage sendMessage =  new SendMessage(chatId,new RegisterCommand().getAnswer(message));
             sendMessage.setReplyMarkup(getFacultiesInlineKeyboard());
+            return sendMessage;
 
         }else {
+            SendMessage sendMessage =  new SendMessage(chatId,"Вы уже были зарегистрированы. Хотите пройти регистрацию заново?");
             sendMessage.setReplyMarkup(getAnswersResetRegistrationInlineKeyBoard());
-            sendMessage.setText("Вы уже были зарегистрированы. Хотите пройти регистрацию заново?");
+            return sendMessage;
         }
-        return sendMessage;
     }
 
     private InlineKeyboardMarkup getFacultiesInlineKeyboard() {
@@ -70,9 +65,10 @@ public class BotMessageCommandService {
                         .text("ФМиИТ")
                         .build()
         );
+        InlineKeyboardRow inlineKeyboardRow = new InlineKeyboardRow(buttonList);
         return InlineKeyboardMarkup
                 .builder()
-                .keyboardRow(buttonList)
+                .keyboardRow(inlineKeyboardRow)
                 .build();
 
     }
@@ -88,9 +84,10 @@ public class BotMessageCommandService {
                         .text("Нет")
                         .build()
         );
+        InlineKeyboardRow inlineKeyboardRow = new InlineKeyboardRow(buttonList);
         return InlineKeyboardMarkup
                 .builder()
-                .keyboardRow(buttonList)
+                .keyboardRow(inlineKeyboardRow)
                 .build();
     }
 }

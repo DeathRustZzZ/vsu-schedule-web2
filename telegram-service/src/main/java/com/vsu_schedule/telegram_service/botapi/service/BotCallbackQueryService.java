@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
-import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
+import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -29,11 +29,9 @@ public class BotCallbackQueryService {
     public BotApiMethod<?> handleFacultyCallbackQuery(CallbackQuery callbackQuery) {
         BotUser user = botUserRepository.findByTelegramId(callbackQuery.getFrom().getId());
         user.setFaculty(callbackQuery.getData().split("\\.")[1]);
-        SendMessage sendMessage = new SendMessage();
-        sendMessage.setText("Выберете группу");
-        sendMessage.setChatId(user.getChatId());
+
         removeInlineMarkup(callbackQuery);
-        return sendMessage;
+        return new SendMessage(user.getChatId().toString(),"Выберете группу");
     }
 
     @Transactional
@@ -41,10 +39,8 @@ public class BotCallbackQueryService {
             removeInlineMarkup(callbackQuery);
             if(callbackQuery.getData().equals(ResetRegistrationCallbackQueryTypes.YES.toString())) {
                 botUserRepository.deleteByTelegramId(callbackQuery.getFrom().getId());
-                SendMessage sendMessage = new SendMessage();
-                sendMessage.setText("Ваш аккаунт был удален для прохождения регистрации отправьте команду /register.");
-                sendMessage.setChatId(callbackQuery.getMessage().getChatId());
-                return sendMessage;
+                return new SendMessage(callbackQuery.getMessage().getChatId().toString(),
+                        "Ваш аккаунт был удален для прохождения регистрации отправьте команду /register.");
             }
             return null;
     }

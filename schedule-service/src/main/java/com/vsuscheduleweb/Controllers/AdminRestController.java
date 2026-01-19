@@ -11,12 +11,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController()
+@RequestMapping("/api/v1/schedule")
 @RequiredArgsConstructor
 public class AdminRestController {
 
     private final ScheduleService scheduleService;
 
-    @PostMapping("/rest/uploadFile")
+    @PostMapping("/uploadFile")
     @ResponseStatus(HttpStatus.OK)
     public void uploadSchedule(@RequestPart MultipartFile file,
                                @RequestParam("f") String fac) {

@@ -14,7 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/rest/auth")
+@RequestMapping("/schedule/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -27,7 +27,7 @@ public class AuthController {
     public ResponseEntity<AuthResponse> register(@RequestBody AppUserDto req){
         return new ResponseEntity<>(authService.register(req), HttpStatus.OK);
     }
-    @PostMapping("/authenticate")
+    @PostMapping()
     public ResponseEntity<AuthResponse> auth(@RequestBody AuthRequest req){
         return new ResponseEntity<>(authService.auth(req), HttpStatus.OK);
     }

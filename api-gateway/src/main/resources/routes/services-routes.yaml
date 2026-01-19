@@ -1,0 +1,34 @@
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: group-service
+          uri: lb://schedule-service
+          predicates:
+            - Path=/api/v1/groups/**
+
+        - id: teacher-service
+          uri: lb://schedule-service
+          predicates:
+            - Path=/api/v1/teachers/**
+
+        - id: schedule-web
+          uri: lb://schedule-service
+          predicates:
+            - Path=/schedule/**
+
+        - id: schedule-auth
+          uri: lb://schedule-service
+          predicates:
+            - Path=/api/v1/schedule/auth/**
+
+        - id: schedule-uploadFile
+          uri: lb://schedule-service
+          predicates:
+            - Path=/api/v1/schedule/uploadFile/**
+
+        - id: telegram-service
+          uri: lb://telegram-service
+          predicates:
+            - Path=/bots/index.php
+            - Method=POST

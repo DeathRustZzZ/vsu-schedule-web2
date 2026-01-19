@@ -1,23 +1,29 @@
 package com.vsu_schedule.telegram_service.botapi;
 
 
+
 import com.vsu_schedule.telegram_service.botapi.command.HelpCommand;
 import com.vsu_schedule.telegram_service.botapi.command.RegisterCommand;
 import com.vsu_schedule.telegram_service.botapi.command.StartCommand;
+import com.vsu_schedule.telegram_service.botapi.config.BotConfig;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.context.event.EventListener;
-import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
+import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
+import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer;
+import org.telegram.telegrambots.longpolling.starter.SpringLongPollingBot;
+import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.methods.updates.SetWebhook;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import org.telegram.telegrambots.starter.SpringWebhookBot;
+import org.telegram.telegrambots.meta.generics.TelegramClient;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,47 +31,32 @@ import java.util.List;
 
 @Setter
 @Getter
-@Accessors(chain = true)
 @Slf4j
-public class ScheduleBot extends SpringWebhookBot {
+@PropertySource("application.yaml")
+@Component
+public class ScheduleBot implements SpringLongPollingBot, LongPollingSingleThreadUpdateConsumer {
 
-    private String botPath;
-    private String botName;
-    private String botToken;
-    private TelegramFacade telegramFacade;
-    private SetWebhook setWebhook;
+
     private List<BotCommand> botCommandList = new ArrayList<>();
+    @Autowired
+    private TelegramFacade telegramFacade;
 
-    public ScheduleBot(SetWebhook setWebhook,
-                       TelegramFacade telegramFacade,
-                       String token,
-                       String name,
-                       String path)  {
-        super(setWebhook,token);
-        this.botToken = token;
-        this.botName = name;
-        this.botPath = path;
-        this.telegramFacade = telegramFacade;
+
+    private final BotConfig botConfig;
+
+    private final TelegramClient telegramClient;
+
+    public ScheduleBot(BotConfig botConfig) {
+        this.botConfig = botConfig;
+        this.telegramClient = new OkHttpTelegramClient(botConfig.getBotToken());
         Collections.addAll(botCommandList,
                 new StartCommand(),
                 new HelpCommand(),
                 new RegisterCommand()
         );
         try {
-            execute(new SetMyCommands(botCommandList, new BotCommandScopeDefault(), null));
+            telegramClient.execute(new SetMyCommands(botCommandList, new BotCommandScopeDefault(), null));
         }catch (TelegramApiException e){
-            log.error(e.getMessage());
-        }
-    }
-    @Override
-    public BotApiMethod<?> onWebhookUpdateReceived(Update req) {
-        return telegramFacade.handleUpdate(req);
-    }
-
-    public void sendMessage(SendMessage message) {
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
             log.error(e.getMessage());
         }
     }
@@ -73,15 +64,28 @@ public class ScheduleBot extends SpringWebhookBot {
     @EventListener
     public void onApplicationEvent(TelegramActionEvent event) {
         try {
-            this.execute(event.getMethod());
+            telegramClient.execute(event.getMethod());
         } catch (TelegramApiException e) {
-            log.error( e.getMessage());
+            log.error(e.getMessage());
         }
     }
 
+    @Override
+    public String getBotToken() {
+        return botConfig.getBotToken();
+    }
 
     @Override
-    public String getBotUsername() {
-        return this.botName;
+    public LongPollingUpdateConsumer getUpdatesConsumer() {
+        return this;
+    }
+
+    @Override
+    public void consume(Update update) {
+        try {
+            telegramClient.execute(telegramFacade.handleUpdate(update));
+        } catch (TelegramApiException e) {
+            log.error(e.getMessage());
+        }
     }
 }

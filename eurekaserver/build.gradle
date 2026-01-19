@@ -1,9 +1,8 @@
 plugins {
-	id 'java'
-	id 'org.springframework.boot' version '3.5.10-SNAPSHOT'
-	id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.springframework.boot' version '3.4.1' // Стабильная версия для начала 2026
+    id 'io.spring.dependency-management' version '1.1.7' // Актуальный плагин управления зависимостями
+    id 'java'
 }
-
 group = 'com.vsu_schedule'
 version = '0.0.1-SNAPSHOT'
 description = 'Demo project for Spring Boot'
@@ -19,9 +18,7 @@ repositories {
 	maven { url = 'https://repo.spring.io/snapshot' }
 }
 
-ext {
-	set('springCloudVersion', "2025.0.1")
-}
+
 
 dependencies {
 	implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-server'
@@ -30,10 +27,12 @@ dependencies {
 }
 
 dependencyManagement {
-	imports {
-		mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
-	}
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:2024.0.0"
+    }
 }
+
+
 
 tasks.named('test') {
 	useJUnitPlatform()
