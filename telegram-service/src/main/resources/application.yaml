@@ -27,3 +27,9 @@ eureka:
 
 bot:
   token: 8019302937:AAFlJwTThl-Ucv5cydJj2o9FQH2dvxPT2n0
+
+feign:
+  client:
+    schedule:
+      name: schedule-service
+      path: api/v1/groups

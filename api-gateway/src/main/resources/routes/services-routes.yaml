@@ -27,6 +27,12 @@ spring:
           predicates:
             - Path=/api/v1/schedule/uploadFile/**
 
+        - id: getAvailableGroupsIdsByFaculty
+          uri: lb://schedule-service
+          predicates:
+            - Path=/api/v1/groups/available/**
+            - Method=GET
+
         - id: telegram-service
           uri: lb://telegram-service
           predicates:

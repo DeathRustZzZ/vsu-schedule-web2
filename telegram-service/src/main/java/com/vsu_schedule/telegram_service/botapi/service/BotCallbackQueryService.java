@@ -3,7 +3,10 @@ package com.vsu_schedule.telegram_service.botapi.service;
 
 import com.vsu_schedule.telegram_service.botapi.TelegramActionEvent;
 import com.vsu_schedule.telegram_service.botapi.callback_query_types.ResetRegistrationCallbackQueryTypes;
+import com.vsu_schedule.telegram_service.dto.GroupWithSubgroupsIds;
+import com.vsu_schedule.telegram_service.dto.ListGroupWithSubgroupsIds;
 import com.vsu_schedule.telegram_service.entity.BotUser;
+import com.vsu_schedule.telegram_service.feign.GroupFeignClient;
 import com.vsu_schedule.telegram_service.repository.BotUserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,11 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -26,12 +34,16 @@ public class BotCallbackQueryService {
 
     private final ApplicationEventPublisher applicationEventPublisher;
 
-    public BotApiMethod<?> handleFacultyCallbackQuery(CallbackQuery callbackQuery) {
-        BotUser user = botUserRepository.findByTelegramId(callbackQuery.getFrom().getId());
-        user.setFaculty(callbackQuery.getData().split("\\.")[1]);
+    private final GroupFeignClient groupFeignClient;
 
+    public BotApiMethod<?> handleFacultyCallbackQuery(CallbackQuery callbackQuery) {
         removeInlineMarkup(callbackQuery);
-        return new SendMessage(user.getChatId().toString(),"Выберете группу");
+        BotUser user = botUserRepository.findByTelegramId(callbackQuery.getFrom().getId());
+        String faculty = callbackQuery.getData().split("\\.")[1];
+        user.setFaculty(faculty);
+        SendMessage sendMessage = new SendMessage(user.getChatId().toString(),"Выберете группу");
+        sendMessage.setReplyMarkup(getGroupInlineKeyboard(faculty));
+        return sendMessage;
     }
 
     @Transactional
@@ -47,9 +59,22 @@ public class BotCallbackQueryService {
 
 
 
-    private InlineKeyboardMarkup getGroupInlineKeyboard() {
-        return null; // TODO добавить автоматический запрос списка групп по факультету на микросервис schedule-service вида List<Groups> ScheduleService.getGroups(String faculty)
-                    // TODO можно кешировать ответ запроса на определенное время что бы снять нагрузкку с schedule-service
+    private InlineKeyboardMarkup getGroupInlineKeyboard(String faculty) {
+        ListGroupWithSubgroupsIds listGroupWithSubgroupsIds = groupFeignClient.getAvailableGroupsByFaculty(faculty);
+        List<InlineKeyboardRow> inlineKeyboardRows = new ArrayList<>();
+        for(GroupWithSubgroupsIds group : listGroupWithSubgroupsIds.getListGroupWithSubgroupsIds()) {
+            for(String subgroupId : group.getSubgroupIds()) {
+                inlineKeyboardRows.add(new InlineKeyboardRow(
+                        InlineKeyboardButton.builder()
+                        .callbackData("group." + group.getGroupId() +"." +  subgroupId)
+                        .text(group.getGroupId() + "/" +subgroupId)
+                        .build()));
+            }
+        }
+
+        return InlineKeyboardMarkup.builder()
+                .keyboard(inlineKeyboardRows)
+                .build();
     }
 
 

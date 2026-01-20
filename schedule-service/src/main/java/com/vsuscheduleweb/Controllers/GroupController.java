@@ -2,6 +2,7 @@ package com.vsuscheduleweb.Controllers;
 
 import com.vsuscheduleweb.DTO.GroupResponse;
 import com.vsuscheduleweb.DTO.ListGroupResponse;
+import com.vsuscheduleweb.DTO.ListGroupWithSubgroupsIds;
 import com.vsuscheduleweb.services.GroupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -28,7 +29,7 @@ public class GroupController {
     }
 
     @GetMapping("/available/{faculty}")
-    public ListGroupResponse getAvailableGroupsByFaculty(@PathVariable String faculty) {
+    public ListGroupWithSubgroupsIds getAvailableGroupsByFaculty(@PathVariable String faculty) {
         return groupService.getAvailableGroupsByFaculty(faculty);
     }
 }
