@@ -47,6 +47,6 @@ public class Lesson {
 
     private String type;
 
-    private String facult;
+    private String faculty;
 
 }

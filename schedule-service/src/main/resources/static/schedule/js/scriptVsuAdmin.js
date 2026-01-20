@@ -6,10 +6,8 @@ const body = document.querySelector("body"),
       submitBtn = document.getElementById("submit_button")
 
 logoutBtn.onclick = function () {
-    token = localStorage.getItem("token");
     var myHeaders = new Headers();
     myHeaders.append("Content-Type", "application/json");
-    myHeaders.append("Authorization", "Bearer " + token);
     myHeaders.append("Cookie", "JSESSIONID=C9A5B398E23E08EBC2392F912302C741");
 
 let files = "";
@@ -20,7 +18,7 @@ let files = "";
       redirect: 'follow'
     };
 
-    fetch("http://127.0.0.1:9898/schedule/auth/logout", requestOptions)
+    fetch("http://127.0.0.1:8765/schedule/auth/logout", requestOptions)
       .then(response => response.text())
       .then(result => {
             localStorage.removeItem("token");
@@ -98,7 +96,6 @@ function sendFiles() {
     }
     let Data = new FormData();
     var myHeaders = new Headers();
-    myHeaders.append("Authorization", "Bearer " + localStorage.getItem("token"));
     myHeaders.append("Cookie", "JSESSIONID=32625BC457E59FAB133BD2B9C60A08A8");
     if(document.getElementById("file-input") === null){
         return // show exception on the page
@@ -117,7 +114,7 @@ function sendFiles() {
       redirect: 'follow'
     };
 
-    fetch("http://127.0.0.1:9898/api/v1/schedule/uploadFile?f=" + facult, requestOptions)
+    fetch("http://127.0.0.1:8765/api/v1/schedule/uploadFile?f=" + facult, requestOptions)
       .then(response => {
             if(response.status == 200){
                 alert("Успешно!")

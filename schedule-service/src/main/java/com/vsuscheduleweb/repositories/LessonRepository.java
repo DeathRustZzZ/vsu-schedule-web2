@@ -12,7 +12,7 @@ public interface LessonRepository extends JpaRepository<Lesson, UUID> {
 
     @Transactional
     @Modifying
-    @Query("delete from lessons l where l.facult = ?1")
-    void deleteAllWhereFacultEquals(String facult);
+    @Query("delete from lessons l where l.faculty = ?1")
+    void deleteAllWhereFacultyEquals(String faculty);
 
 }

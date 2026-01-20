@@ -29,6 +29,9 @@ public class Group {
     @Column(name = "group_name")
     private String name;
 
+    @Column(name = "faculty")
+    private String faculty;
+
     private transient int countOfSubGroups;
 
     public void addLesson(Lesson lesson){
@@ -38,5 +41,7 @@ public class Group {
     public void addSubgroup(Subgroup subgroup){
         subgroups.add(subgroup);
     }
+
+
 
 }

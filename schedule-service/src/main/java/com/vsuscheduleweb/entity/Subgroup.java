@@ -25,6 +25,10 @@ public class Subgroup {
 
     @Column(name = "group_id")
     private String groupId;
+
+    @Column(name = "faculty")
+    private String faculty;
+
     public void addLesson(Lesson lesson){
         lessons.add(lesson);
     }

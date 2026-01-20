@@ -26,4 +26,9 @@ public class GroupController {
     public GroupResponse getById(@PathVariable String id) {
         return groupService.getById(id);
     }
+
+    @GetMapping("/available/{faculty}")
+    public ListGroupResponse getAvailableGroupsByFaculty(@PathVariable String faculty) {
+        return groupService.getAvailableGroupsByFaculty(faculty);
+    }
 }

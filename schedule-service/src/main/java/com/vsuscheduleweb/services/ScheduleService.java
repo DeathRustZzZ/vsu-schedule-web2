@@ -35,19 +35,19 @@ public class ScheduleService {
 
     private final LessonRepository lessonRepository;
 
-    public void uploadSchedule(MultipartFile multipartFile, String facult) {
-        lessonRepository.deleteAllWhereFacultEquals(facult);
+    public void uploadSchedule(MultipartFile multipartFile, String faculty) {
+        lessonRepository.deleteAllWhereFacultyEquals(faculty);
         File file = saveFile(multipartFile);
-        parser.parse(file, facult);
+        parser.parse(file, faculty);
         List<Group> groups = parser.getGroups();
         List<Lesson> lessons = parser.getLessons();
         List<Teacher> teachers = parser.getTeachers();
         for (Lesson lesson : lessons) {
-            lesson.setFacult(facult);
+            lesson.setFaculty(faculty);
             lesson.setTeacherId(-1);
         }
         processTeachers(teachers);
-        processGroups(groups);
+        processGroups(groups,faculty);
 
     }
 
@@ -88,9 +88,10 @@ public class ScheduleService {
 
     }
 
-    private void processGroups(List<Group> groups) {
+    private void processGroups(List<Group> groups, String faculty) {
         for (Group group : groups) {
             group.setId(group.getId().replace('/', '.'));
+            group.setFaculty(faculty);
             for (int j = 0; j < group.getCommonLessons().size(); j++) {
                 Lesson lesson = group.getCommonLessons().get(j);
                 lesson.setGroupId(group.getId());
@@ -98,6 +99,7 @@ public class ScheduleService {
             for (int j = 0; j < group.getSubgroups().size(); j++) {
                 Subgroup subgroup = group.getSubgroups().get(j);
                 subgroup.setGroupId(group.getId());
+                subgroup.setFaculty(faculty);
                 for (int k = 0; k < subgroup.getLessons().size(); k++) {
                     Lesson lesson = subgroup.getLessons().get(k);
                     lesson.setSubgroupId(subgroup.getId());

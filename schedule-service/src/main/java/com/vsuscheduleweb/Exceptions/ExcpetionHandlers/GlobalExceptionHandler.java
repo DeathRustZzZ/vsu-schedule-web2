@@ -5,7 +5,6 @@ package com.vsuscheduleweb.Exceptions.ExcpetionHandlers;
 
 import com.vsuscheduleweb.Exceptions.*;
 import com.vsuscheduleweb.Exceptions.Errors.AppError;
-import io.jsonwebtoken.ExpiredJwtException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,16 +31,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<AppError> ObjectIsPresentExceptionHandler(ObjectIsPresentException ex){
         log.error(ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new AppError(ex.getMessage()));
-    }
-
-    @ExceptionHandler({
-            TokenException.class,
-            ExpiredJwtException.class
-    })
-    public ResponseEntity<AppError> authExceptionHandler(RuntimeException ex){
-        log.error(ex.getMessage());
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new AppError(ex.getMessage()));
     }
 

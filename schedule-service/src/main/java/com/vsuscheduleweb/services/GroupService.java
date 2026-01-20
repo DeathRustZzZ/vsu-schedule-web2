@@ -31,4 +31,12 @@ public class GroupService {
         );
     }
 
+    public ListGroupResponse getAvailableGroupsByFaculty(String faculty) {
+        return new ListGroupResponse(
+                groupRepository.findByFaculty(faculty)
+                        .stream()
+                        .map(groupMapper::entityToResponse)
+                        .toList()
+        );
+    }
 }

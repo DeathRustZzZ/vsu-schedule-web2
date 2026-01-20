@@ -19,7 +19,7 @@ public class AdminController {
 
     @GetMapping("/")
     public String getRoot(){
-        return "redirect:/vsuAdmin";
+        return "redirect:/schedule/admin";
     }
 
     @GetMapping("/login")

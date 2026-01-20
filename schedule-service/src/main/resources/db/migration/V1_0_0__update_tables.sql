@@ -10,24 +10,10 @@ CREATE TABLE "app_user"(
 
 );
 
-CREATE TABLE "token"(
-    token_id UUID PRIMARY KEY NOT NULL,
-    token varchar(300),
-    token_type varchar(20),
-    revoked boolean,
-    expired boolean,
-    user_id UUID
-
-);
-
-CREATE TABLE "tb_role"(
-    user_id UUID NOT NULL,
-    role VARCHAR(40)
-);
-
 CREATE TABLE "groups"(
     group_id VARCHAR(40) PRIMARY KEY NOT NULL,
-    group_name VARCHAR(150) NOT NULL
+    group_name VARCHAR(150) NOT NULL,
+    faculty varchar(40)
 );
 
 CREATE TABLE "teachers"(
@@ -51,15 +37,16 @@ CREATE TABLE "lessons"(
     "date" varchar(15),
     weekday varchar(15),
     lesson_name varchar(150),
-    type varchar(20),
+    "type" varchar(20),
     subgroup_id varchar(40),
     group_id varchar(40),
     teacher_id integer,
-    facult varchar(100)
+    faculty varchar(100)
 );
 
 CREATE TABLE "subgroups"(
     subgroups_id varchar(40),
-    group_id varchar(40)
+    group_id varchar(40),
+    faculty varchar(40)
 );
 
