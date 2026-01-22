@@ -27,4 +27,11 @@ public class LessonService {
                 .stream()
                 .map(lessonMapper::entityToResponse).toList());
     }
+
+    public ListLessonResponse getLessonsByGroupAndSubgroupAndWeekDay(String groupId, String subgroupId, String weekDay) {
+        return new ListLessonResponse(lessonRepository
+                .findByGroupOrSubgroupAndWeekDay(groupId, subgroupId, weekDay)
+                .stream()
+                .map(lessonMapper::entityToResponse).toList());
+    }
 }

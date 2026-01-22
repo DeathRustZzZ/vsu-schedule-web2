@@ -23,10 +23,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Component
 @RequiredArgsConstructor
@@ -122,6 +119,7 @@ public class BotMessageCommandService {
                 weekDays.add(lessonResponse.getWeekDay());
             }
         }
+        sortDaysOfWeek(weekDays);
         for(String weekDay : weekDays) {
             keyboardRows.add(new InlineKeyboardRow(
                     InlineKeyboardButton.builder()
@@ -132,6 +130,13 @@ public class BotMessageCommandService {
         return InlineKeyboardMarkup.builder()
                 .keyboard(keyboardRows)
                 .build();
+    }
+    private void sortDaysOfWeek(List<String> days) {
+        List<String> weekOrder = List.of(
+                "ПОНЕДЕЛЬНИК", "ВТОРНИК", "СРЕДА", "ЧЕТВЕРГ", "ПЯТНИЦА", "СУББОТА", "ВОСКРЕСЕНЬЕ"
+        );
+
+        days.sort(Comparator.comparingInt(day -> weekOrder.indexOf(day.toUpperCase())));
     }
 
 }

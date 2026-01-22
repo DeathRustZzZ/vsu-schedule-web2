@@ -24,4 +24,11 @@ public class LessonController {
     public ListLessonResponse getLessonsByGroupAndSubgroup(@PathVariable String groupId, @PathVariable String subgroupId) {
         return lessonService.getLessonsByGroupAndSubgroup(groupId,subgroupId);
     }
+
+    @GetMapping("/{groupId}/{subgroupId}/{weekDay}")
+    public ListLessonResponse getLessonsByGroupAndSubgroupAndWeekDay(@PathVariable String groupId,
+                                                                     @PathVariable String subgroupId,
+                                                                     @PathVariable String weekDay){
+        return lessonService.getLessonsByGroupAndSubgroupAndWeekDay(groupId,subgroupId,weekDay);
+    }
 }

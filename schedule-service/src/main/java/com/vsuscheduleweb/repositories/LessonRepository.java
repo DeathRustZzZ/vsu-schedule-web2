@@ -1,6 +1,7 @@
 package com.vsuscheduleweb.repositories;
 
 import com.vsuscheduleweb.entity.Lesson;
+import feign.Param;
 import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -17,4 +18,10 @@ public interface LessonRepository extends JpaRepository<Lesson, UUID> {
     void deleteAllWhereFacultyEquals(String faculty);
 
     List<Lesson> findByGroupIdOrSubgroupId(String groupId, String subgroupId);
+    @Query("SELECT l FROM lessons l WHERE (l.groupId = :groupId OR l.subgroupId = :subgroupId) AND l.weekDay = :weekDay")
+    List<Lesson> findByGroupOrSubgroupAndWeekDay(
+            @Param("groupId") String groupId,
+            @Param("subgroupId") String subgroupId,
+            @Param("weekDay") String weekDay
+    );
 }

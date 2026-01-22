@@ -7,6 +7,8 @@ import org.springframework.cloud.openfeign.FeignClientsConfiguration;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
+import java.util.List;
+
 @FeignClient(
         contextId = "lessonClient",
         value = "${feign.client.lessons.name}",
@@ -16,4 +18,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface LessonFeignClient {
     @GetMapping("/{groupId}/{subgroupId}")
     ListLessonResponse getLessonsByGroupAndSubgroup(@PathVariable String groupId, @PathVariable String subgroupId);
+    @GetMapping("/{groupId}/{subgroupId}/{weekDay}")
+    ListLessonResponse getLessonsByGroupAndSubgroupAndWeekDay(@PathVariable String groupId,
+                                                              @PathVariable String subgroupId,
+                                                              @PathVariable String weekDay);
 }

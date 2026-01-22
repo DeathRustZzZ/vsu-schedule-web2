@@ -4,9 +4,12 @@ package com.vsu_schedule.telegram_service.botapi.service;
 import com.vsu_schedule.telegram_service.botapi.TelegramActionEvent;
 import com.vsu_schedule.telegram_service.botapi.callback_query_types.ResetRegistrationCallbackQueryTypes;
 import com.vsu_schedule.telegram_service.dto.GroupWithSubgroupsIds;
+import com.vsu_schedule.telegram_service.dto.LessonResponse;
 import com.vsu_schedule.telegram_service.dto.ListGroupWithSubgroupsIds;
+import com.vsu_schedule.telegram_service.dto.ListLessonResponse;
 import com.vsu_schedule.telegram_service.entity.BotUser;
 import com.vsu_schedule.telegram_service.feign.GroupFeignClient;
+import com.vsu_schedule.telegram_service.feign.LessonFeignClient;
 import com.vsu_schedule.telegram_service.repository.BotUserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +38,8 @@ public class BotCallbackQueryService {
     private final ApplicationEventPublisher applicationEventPublisher;
 
     private final GroupFeignClient groupFeignClient;
+
+    private final LessonFeignClient lessonFeignClient;
 
     public BotApiMethod<?> handleFacultyCallbackQuery(CallbackQuery callbackQuery) {
         removeInlineMarkup(callbackQuery);
@@ -69,7 +74,44 @@ public class BotCallbackQueryService {
 
     }
 
+    public BotApiMethod<?> handleWeekDayCallbackQuery(CallbackQuery query) {
+        removeInlineMarkup(query);
+        String weekDay =  query.getData().split("\\.")[1];
+        BotUser botUser = botUserRepository.findByTelegramId(query.getFrom().getId()).get();
+        ListLessonResponse lessonResponse = lessonFeignClient.getLessonsByGroupAndSubgroupAndWeekDay(
+                botUser.getGroupId(),
+                botUser.getSubgroupId(),
+                weekDay);
+        return SendMessage.builder()
+                .text(buildLessonsStringWithWeekDay(lessonResponse,weekDay))
+                .chatId(botUser.getChatId()).build();
 
+
+    }
+
+    private String buildLessonsStringWithWeekDay(ListLessonResponse response, String weekDay) {
+        List<LessonResponse> lessons = response.getLessonResponses();
+
+        if (lessons.isEmpty()) {
+            return "📅 *Расписание на " + weekDay + "*\n\nНикаких занятий не найдено 😴";
+        }
+
+        String date = lessons.get(0).getDate();
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("📅 *Расписание на ").append(weekDay).append("*")
+                .append(" (").append(date).append(")\n\n");
+
+        for (int i = 0; i < lessons.size(); i++) {
+            LessonResponse lesson = lessons.get(i);
+
+            sb.append(String.format("%d. *%s* (%s)\n", i + 1, lesson.getName(), lesson.getType()))
+                    .append(String.format("⏰ `%s — %s`\n", lesson.getStartTime(), lesson.getEndTime()))
+                    .append(String.format("📍 _%s_\n\n", lesson.getAuditorium()));
+        }
+
+        return sb.toString();
+    }
 
     private InlineKeyboardMarkup getGroupInlineKeyboard(String faculty) {
         ListGroupWithSubgroupsIds listGroupWithSubgroupsIds = groupFeignClient.getAvailableGroupsByFaculty(faculty);
@@ -107,7 +149,4 @@ public class BotCallbackQueryService {
         applicationEventPublisher.publishEvent(new TelegramActionEvent(this, answerCallbackQuery));
     }
 
-    public BotApiMethod<?> handleWeekDayCallbackQuery(CallbackQuery query) {
-        return null;
-    }
 }
