@@ -2,6 +2,7 @@ package com.vsu_schedule.telegram_service.botapi.handler;
 
 import com.vsu_schedule.telegram_service.botapi.command.HelpCommand;
 import com.vsu_schedule.telegram_service.botapi.command.RegisterCommand;
+import com.vsu_schedule.telegram_service.botapi.command.ScheduleCommand;
 import com.vsu_schedule.telegram_service.botapi.command.StartCommand;
 import com.vsu_schedule.telegram_service.botapi.service.BotMessageCommandService;
 import lombok.RequiredArgsConstructor;
@@ -18,15 +19,20 @@ public class BotMessageCommandHandler {
 
     private final BotMessageCommandService commandService;
 
-    public BotApiMethod<?> handle(Message message){
+    public BotApiMethod<?> handle(Message message) {
         String commandName = message.getText();
-        if(commandName.equals(StartCommand.getCommandName())) {
+        if (commandName.equals(StartCommand.getCommandName())) {
             return commandService.handleStartCommand(message);
         }
-        if(commandName.equals(HelpCommand.getCommandName()))
+        if (commandName.equals(HelpCommand.getCommandName())) {
             return commandService.handleHelpCommand(message);
-        if(commandName.equals(RegisterCommand.getCommandName()))
+        }
+        if (commandName.equals(RegisterCommand.getCommandName())) {
             return commandService.handleRegisterCommand(message);
+        }
+        if(commandName.equals(ScheduleCommand.getCommandName())) {
+            return commandService.handleScheduleCommand(message);
+        }
         return null;
     }
 }

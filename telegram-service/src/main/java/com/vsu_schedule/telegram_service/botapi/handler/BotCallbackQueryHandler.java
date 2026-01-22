@@ -23,6 +23,12 @@ public class BotCallbackQueryHandler {
         if(query.getData().contains("reset.registration.btn")) {
             return botCallbackQueryService.handleResetRegistrationQuery(query);
         }
+        if(query.getData().contains("group")) {
+            return botCallbackQueryService.handleGroupCallbackQuery(query);
+        }
+        if(query.getData().contains("weekDay")) {
+            return botCallbackQueryService.handleWeekDayCallbackQuery(query);
+        }
         return null;
     }
 

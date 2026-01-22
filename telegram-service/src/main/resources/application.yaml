@@ -30,6 +30,9 @@ bot:
 
 feign:
   client:
-    schedule:
+    groups:
       name: schedule-service
       path: api/v1/groups
+    lessons:
+      name: schedule-service
+      path: api/v1/lessons

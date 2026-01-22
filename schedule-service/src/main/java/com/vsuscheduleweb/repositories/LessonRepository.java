@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface LessonRepository extends JpaRepository<Lesson, UUID> {
@@ -15,4 +16,5 @@ public interface LessonRepository extends JpaRepository<Lesson, UUID> {
     @Query("delete from lessons l where l.faculty = ?1")
     void deleteAllWhereFacultyEquals(String faculty);
 
+    List<Lesson> findByGroupIdOrSubgroupId(String groupId, String subgroupId);
 }

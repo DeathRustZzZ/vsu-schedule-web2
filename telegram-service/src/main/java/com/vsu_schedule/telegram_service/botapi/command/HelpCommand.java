@@ -16,7 +16,9 @@ public class HelpCommand extends BotCommand implements Command {
         return "Вот список доступных:\n" +
                 "/help - Помощь\n" +
                 "/start - Стартовая команда\n" +
-                "/register - регистрация\n";
+                "/register - Регистрация\n" +
+                "/schedule - Расписание\n";
+
     }
 
     public static String getCommandName() {

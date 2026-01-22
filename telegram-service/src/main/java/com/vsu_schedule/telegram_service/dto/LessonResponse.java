@@ -1,4 +1,4 @@
-package com.vsuscheduleweb.DTO;
+package com.vsu_schedule.telegram_service.dto;
 
 import lombok.*;
 

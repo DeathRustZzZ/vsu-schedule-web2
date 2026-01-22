@@ -38,7 +38,7 @@ public class BotCallbackQueryService {
 
     public BotApiMethod<?> handleFacultyCallbackQuery(CallbackQuery callbackQuery) {
         removeInlineMarkup(callbackQuery);
-        BotUser user = botUserRepository.findByTelegramId(callbackQuery.getFrom().getId());
+        BotUser user = botUserRepository.findByTelegramId(callbackQuery.getFrom().getId()).get();
         String faculty = callbackQuery.getData().split("\\.")[1];
         user.setFaculty(faculty);
         SendMessage sendMessage = new SendMessage(user.getChatId().toString(),"Выберете группу");
@@ -57,6 +57,18 @@ public class BotCallbackQueryService {
             return null;
     }
 
+    public BotApiMethod<?> handleGroupCallbackQuery(CallbackQuery callbackQuery) {
+        removeInlineMarkup(callbackQuery);
+        BotUser user = botUserRepository.findByTelegramId(callbackQuery.getFrom().getId()).get();
+        String[] callbackQuerySplitArr = callbackQuery.getData().split("\\.");
+        user.setGroupId(callbackQuerySplitArr[1].replaceAll("/","."));
+        user.setSubgroupId(callbackQuerySplitArr[callbackQuerySplitArr.length - 1]);
+        botUserRepository.save(user);
+        return new SendMessage(callbackQuery.getMessage().getChatId().toString(),
+                "Вы были успешно зарегистрированы!");
+
+    }
+
 
 
     private InlineKeyboardMarkup getGroupInlineKeyboard(String faculty) {
@@ -66,7 +78,7 @@ public class BotCallbackQueryService {
             for(String subgroupId : group.getSubgroupIds()) {
                 inlineKeyboardRows.add(new InlineKeyboardRow(
                         InlineKeyboardButton.builder()
-                        .callbackData("group." + group.getGroupId() +"." +  subgroupId)
+                        .callbackData("group." + group.getGroupId().replaceAll("\\." , "/") +"." +  subgroupId)
                         .text(group.getGroupId() + "/" +subgroupId)
                         .build()));
             }
@@ -93,5 +105,9 @@ public class BotCallbackQueryService {
                 .callbackQueryId(callbackQuery.getId())
                 .build();
         applicationEventPublisher.publishEvent(new TelegramActionEvent(this, answerCallbackQuery));
+    }
+
+    public BotApiMethod<?> handleWeekDayCallbackQuery(CallbackQuery query) {
+        return null;
     }
 }

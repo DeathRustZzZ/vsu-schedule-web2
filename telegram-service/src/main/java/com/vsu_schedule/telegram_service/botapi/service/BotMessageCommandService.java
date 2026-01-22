@@ -5,8 +5,12 @@ import com.vsu_schedule.telegram_service.botapi.callback_query_types.FacultyCall
 import com.vsu_schedule.telegram_service.botapi.callback_query_types.ResetRegistrationCallbackQueryTypes;
 import com.vsu_schedule.telegram_service.botapi.command.HelpCommand;
 import com.vsu_schedule.telegram_service.botapi.command.RegisterCommand;
+import com.vsu_schedule.telegram_service.botapi.command.ScheduleCommand;
 import com.vsu_schedule.telegram_service.botapi.command.StartCommand;
+import com.vsu_schedule.telegram_service.dto.LessonResponse;
+import com.vsu_schedule.telegram_service.dto.ListLessonResponse;
 import com.vsu_schedule.telegram_service.entity.BotUser;
+import com.vsu_schedule.telegram_service.feign.LessonFeignClient;
 import com.vsu_schedule.telegram_service.repository.BotUserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +26,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -29,6 +34,8 @@ import java.util.List;
 public class BotMessageCommandService {
 
     private final BotUserRepository botUserRepository;
+
+    private final LessonFeignClient lessonFeignClient;
 
     public BotApiMethod<?> handleStartCommand(Message message){
         String chatId = message.getChatId().toString();
@@ -52,9 +59,25 @@ public class BotMessageCommandService {
 
         }else {
             SendMessage sendMessage =  new SendMessage(chatId,"Вы уже были зарегистрированы. Хотите пройти регистрацию заново?");
-            sendMessage.setReplyMarkup(getAnswersResetRegistrationInlineKeyBoard());
+            sendMessage.setReplyMarkup(getAnswersResetRegistrationInlineKeyboard());
             return sendMessage;
         }
+    }
+
+    public BotApiMethod<?> handleScheduleCommand(Message message) {
+        String chatId = message.getChatId().toString();
+        Optional<BotUser> opt_user = botUserRepository.findByTelegramId(message.getFrom().getId());
+        if(opt_user.isPresent()){
+            BotUser user = opt_user.get();
+            if(user.getGroupId() == null || user.getSubgroupId() == null)
+                return new SendMessage(chatId, new ScheduleCommand().getAnswerTextForUnregisteredUsers(message.getFrom().getUserName()));
+
+            ListLessonResponse listLessonResponse = lessonFeignClient.getLessonsByGroupAndSubgroup(user.getGroupId(),user.getSubgroupId());
+            SendMessage sendMessage = new SendMessage(chatId,"Выберете день недели");
+            sendMessage.setReplyMarkup(getDayOfWeekSelectInlineKeyboard(listLessonResponse));
+            return sendMessage;
+        }
+        return new SendMessage(chatId, new ScheduleCommand().getAnswerTextForUnregisteredUsers(message.getFrom().getUserName()));
     }
 
     private InlineKeyboardMarkup getFacultiesInlineKeyboard() {
@@ -72,7 +95,7 @@ public class BotMessageCommandService {
                 .build();
 
     }
-    private InlineKeyboardMarkup getAnswersResetRegistrationInlineKeyBoard() {
+    private InlineKeyboardMarkup getAnswersResetRegistrationInlineKeyboard() {
         List<InlineKeyboardButton> buttonList = new ArrayList<>();
         Collections.addAll(buttonList,
                 InlineKeyboardButton.builder()
@@ -90,4 +113,25 @@ public class BotMessageCommandService {
                 .keyboardRow(inlineKeyboardRow)
                 .build();
     }
+
+    private InlineKeyboardMarkup getDayOfWeekSelectInlineKeyboard(ListLessonResponse lessons) {
+        List<String> weekDays = new ArrayList<>();
+        List<InlineKeyboardRow> keyboardRows = new ArrayList<>();
+        for(LessonResponse lessonResponse : lessons.getLessonResponses()) {
+            if(!weekDays.contains(lessonResponse.getWeekDay())) {
+                weekDays.add(lessonResponse.getWeekDay());
+            }
+        }
+        for(String weekDay : weekDays) {
+            keyboardRows.add(new InlineKeyboardRow(
+                    InlineKeyboardButton.builder()
+                            .text(weekDay)
+                            .callbackData("weekDay." + weekDay).build()
+            ));
+        }
+        return InlineKeyboardMarkup.builder()
+                .keyboard(keyboardRows)
+                .build();
+    }
+
 }

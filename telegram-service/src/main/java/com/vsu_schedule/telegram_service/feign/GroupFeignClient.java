@@ -7,8 +7,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 @FeignClient(
-        value = "${feign.client.schedule.name}",
-        path = "${feign.client.schedule.path}",
+        contextId = "groupClient",
+        value = "${feign.client.groups.name}",
+        path = "${feign.client.groups.path}",
         configuration = FeignClientsConfiguration.class
 )
 public interface GroupFeignClient {

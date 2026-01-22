@@ -38,3 +38,14 @@ spring:
           predicates:
             - Path=/bots/index.php
             - Method=POST
+
+        - id: lesson-service
+          uri: lb://schedule-service
+          predicates:
+            - Path=/api/v1/lessons/**
+
+        - id: lessonsGetAll
+          uri: lb://schedule-service
+          predicates:
+            - Path=/api/v1/lessons
+            - Method=GET

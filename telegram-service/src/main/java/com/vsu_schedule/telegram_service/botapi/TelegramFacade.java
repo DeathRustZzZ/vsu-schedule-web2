@@ -18,14 +18,13 @@ public class TelegramFacade {
     private final BotCallbackQueryHandler callbackQueryHandler;
 
     public BotApiMethod<?> handleUpdate(Update req) {
-        if(req.hasMessage()){
-
+        if (req.hasMessage()) {
             Message message = req.getMessage();
-            if(message.getText().toCharArray()[0] == '/') {
+            if (message.getText().toCharArray()[0] == '/') {
                 return commandHandler.handle(message);
             }
         }
-        if(req.hasCallbackQuery()){
+        if (req.hasCallbackQuery()) {
             log.info("req.hasCallbackQuery");
             return callbackQueryHandler.handle(req.getCallbackQuery());
         }

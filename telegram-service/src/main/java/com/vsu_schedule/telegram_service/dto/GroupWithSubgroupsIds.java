@@ -16,8 +16,7 @@ public class GroupWithSubgroupsIds {
     private String groupId;
     private final List<String> subgroupIds = new ArrayList<>();
 
-    public void addSubgroupId(String id){
+    public void addSubgroupId(String id) {
         subgroupIds.add(id);
     }
-
 }
