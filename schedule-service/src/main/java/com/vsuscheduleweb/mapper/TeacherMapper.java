@@ -13,7 +13,6 @@ public class TeacherMapper {
     private final LessonMapper lessonMapper;
 
     public TeacherResponse entityToResponse(Teacher teacher){
-        return mapper.map(teacher, TeacherResponse.class)
-                .setLessons(teacher.getLessons().stream().map(lessonMapper::entityToResponse).toList());
+        return mapper.map(teacher, TeacherResponse.class);
     }
 }

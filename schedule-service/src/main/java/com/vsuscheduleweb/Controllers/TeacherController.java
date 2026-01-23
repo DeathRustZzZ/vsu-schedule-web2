@@ -29,7 +29,7 @@ public class TeacherController {
 
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
-    public TeacherResponse getById(@PathVariable UUID id) {
+    public TeacherResponse getById(@PathVariable Integer id) {
         return teacherService.getById(id);
     }
 

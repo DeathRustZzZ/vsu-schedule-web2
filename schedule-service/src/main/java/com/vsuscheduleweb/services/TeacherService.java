@@ -19,7 +19,7 @@ public class TeacherService {
     private final TeacherRepository teacherRepository;
     private final TeacherMapper mapper;
 
-    public TeacherResponse getById(UUID id) {
+    public TeacherResponse getById(Integer id) {
         return mapper.entityToResponse(teacherRepository.findById(id).orElseThrow(
                 () -> new TeacherNotFoundException(String.format("teacher with id: %s is not found.", id))
         ));

@@ -36,3 +36,6 @@ feign:
     lessons:
       name: schedule-service
       path: api/v1/lessons
+    teachers:
+      name: schedule-service
+      path: api/v1/teachers

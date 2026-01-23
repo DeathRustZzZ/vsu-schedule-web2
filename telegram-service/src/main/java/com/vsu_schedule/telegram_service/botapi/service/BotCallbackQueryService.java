@@ -3,13 +3,11 @@ package com.vsu_schedule.telegram_service.botapi.service;
 
 import com.vsu_schedule.telegram_service.botapi.TelegramActionEvent;
 import com.vsu_schedule.telegram_service.botapi.callback_query_types.ResetRegistrationCallbackQueryTypes;
-import com.vsu_schedule.telegram_service.dto.GroupWithSubgroupsIds;
-import com.vsu_schedule.telegram_service.dto.LessonResponse;
-import com.vsu_schedule.telegram_service.dto.ListGroupWithSubgroupsIds;
-import com.vsu_schedule.telegram_service.dto.ListLessonResponse;
+import com.vsu_schedule.telegram_service.dto.*;
 import com.vsu_schedule.telegram_service.entity.BotUser;
 import com.vsu_schedule.telegram_service.feign.GroupFeignClient;
 import com.vsu_schedule.telegram_service.feign.LessonFeignClient;
+import com.vsu_schedule.telegram_service.feign.TeacherFeignClient;
 import com.vsu_schedule.telegram_service.repository.BotUserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +24,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 
 @Component
@@ -40,6 +40,8 @@ public class BotCallbackQueryService {
     private final GroupFeignClient groupFeignClient;
 
     private final LessonFeignClient lessonFeignClient;
+
+    private final TeacherFeignClient teacherFeignClient;
 
     public BotApiMethod<?> handleFacultyCallbackQuery(CallbackQuery callbackQuery) {
         removeInlineMarkup(callbackQuery);
@@ -90,27 +92,35 @@ public class BotCallbackQueryService {
     }
 
     private String buildLessonsStringWithWeekDay(ListLessonResponse response, String weekDay) {
-        List<LessonResponse> lessons = response.getLessonResponses();
-
+        List<LessonResponse> lessons = response.getLessonResponses().stream()
+                .sorted(Comparator.comparing(LessonResponse::getStartTime))
+                .toList();
         if (lessons.isEmpty()) {
             return "📅 *Расписание на " + weekDay + "*\n\nНикаких занятий не найдено 😴";
         }
-
+        HashMap<Integer, TeacherResponse> teacherResponseById = getTeachersForLessons(response);
         String date = lessons.get(0).getDate();
         StringBuilder sb = new StringBuilder();
-
         sb.append("📅 *Расписание на ").append(weekDay).append("*")
                 .append(" (").append(date).append(")\n\n");
 
         for (int i = 0; i < lessons.size(); i++) {
             LessonResponse lesson = lessons.get(i);
-
             sb.append(String.format("%d. *%s* (%s)\n", i + 1, lesson.getName(), lesson.getType()))
                     .append(String.format("⏰ `%s — %s`\n", lesson.getStartTime(), lesson.getEndTime()))
-                    .append(String.format("📍 _%s_\n\n", lesson.getAuditorium()));
+                    .append(String.format("📍 _%s_", lesson.getAuditorium()))
+                    .append(String.format("\n\uD83E\uDDD1\u200D\uD83C\uDFEB %s\n\n", lesson.getTeacherId() == -1 ? "" :
+                            teacherResponseById.get(lesson.getTeacherId()).getFullname()));
         }
-
         return sb.toString();
+    }
+
+    private HashMap<Integer,TeacherResponse> getTeachersForLessons(ListLessonResponse listLessonResponse) {
+        HashMap<Integer,TeacherResponse> teacherResponseById = new HashMap<>();
+        for(LessonResponse lesson : listLessonResponse.getLessonResponses()) {
+            teacherResponseById.put(lesson.getTeacherId(),teacherFeignClient.getTeacherById(lesson.getTeacherId().toString()));
+        }
+        return teacherResponseById;
     }
 
     private InlineKeyboardMarkup getGroupInlineKeyboard(String faculty) {

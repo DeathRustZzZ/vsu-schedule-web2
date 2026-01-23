@@ -1,11 +1,10 @@
-package com.vsuscheduleweb.DTO;
+package com.vsu_schedule.telegram_service.dto;
 
-import com.vsuscheduleweb.entity.Lesson;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.Accessors;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Getter
 @Setter
