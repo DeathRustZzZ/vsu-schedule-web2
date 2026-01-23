@@ -1,5 +1,6 @@
 package com.vsu_schedule.telegram_service.botapi.handler;
 
+import com.vsu_schedule.telegram_service.botapi.cache.TeacherSessionStore;
 import com.vsu_schedule.telegram_service.botapi.command.HelpCommand;
 import com.vsu_schedule.telegram_service.botapi.command.RegisterCommand;
 import com.vsu_schedule.telegram_service.botapi.command.ScheduleCommand;
@@ -19,8 +20,13 @@ public class BotMessageCommandHandler {
 
     private final BotMessageCommandService commandService;
 
+    private final TeacherSessionStore teacherSessionStore;
+
     public BotApiMethod<?> handle(Message message) {
         String commandName = message.getText();
+        if(teacherSessionStore.get(message.getFrom().getId()) != null) {
+            teacherSessionStore.remove(message.getFrom().getId());
+        }
         if (commandName.equals(StartCommand.getCommandName())) {
             return commandService.handleStartCommand(message);
         }

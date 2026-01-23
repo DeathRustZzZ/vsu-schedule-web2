@@ -3,10 +3,7 @@ package com.vsu_schedule.telegram_service.botapi.service;
 
 import com.vsu_schedule.telegram_service.botapi.callback_query_types.FacultyCallbackQueryTypes;
 import com.vsu_schedule.telegram_service.botapi.callback_query_types.ResetRegistrationCallbackQueryTypes;
-import com.vsu_schedule.telegram_service.botapi.command.HelpCommand;
-import com.vsu_schedule.telegram_service.botapi.command.RegisterCommand;
-import com.vsu_schedule.telegram_service.botapi.command.ScheduleCommand;
-import com.vsu_schedule.telegram_service.botapi.command.StartCommand;
+import com.vsu_schedule.telegram_service.botapi.command.*;
 import com.vsu_schedule.telegram_service.dto.LessonResponse;
 import com.vsu_schedule.telegram_service.dto.ListLessonResponse;
 import com.vsu_schedule.telegram_service.entity.BotUser;
@@ -24,6 +21,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 
 import java.util.*;
+
+import static com.vsu_schedule.telegram_service.botapi.keyboard.MessageKeyboards.*;
 
 @Component
 @RequiredArgsConstructor
@@ -67,76 +66,16 @@ public class BotMessageCommandService {
         if(opt_user.isPresent()){
             BotUser user = opt_user.get();
             if(user.getGroupId() == null || user.getSubgroupId() == null)
-                return new SendMessage(chatId, new ScheduleCommand().getAnswerTextForUnregisteredUsers(message.getFrom().getUserName()));
+                return new SendMessage(chatId, Command.getAnswerTextForUnregisteredUsers(message.getFrom().getUserName()));
 
             ListLessonResponse listLessonResponse = lessonFeignClient.getLessonsByGroupAndSubgroup(user.getGroupId(),user.getSubgroupId());
             SendMessage sendMessage = new SendMessage(chatId,"Выберете день недели");
             sendMessage.setReplyMarkup(getDayOfWeekSelectInlineKeyboard(listLessonResponse));
             return sendMessage;
         }
-        return new SendMessage(chatId, new ScheduleCommand().getAnswerTextForUnregisteredUsers(message.getFrom().getUserName()));
+        return new SendMessage(chatId, Command.getAnswerTextForUnregisteredUsers(message.getFrom().getUserName()));
     }
 
-    private InlineKeyboardMarkup getFacultiesInlineKeyboard() {
-        List<InlineKeyboardButton> buttonList = new ArrayList<>();
-        Collections.addAll(buttonList,
-                InlineKeyboardButton.builder()
-                        .callbackData(FacultyCallbackQueryTypes.FMIIT.toString())
-                        .text("ФМиИТ")
-                        .build()
-        );
-        InlineKeyboardRow inlineKeyboardRow = new InlineKeyboardRow(buttonList);
-        return InlineKeyboardMarkup
-                .builder()
-                .keyboardRow(inlineKeyboardRow)
-                .build();
 
-    }
-    private InlineKeyboardMarkup getAnswersResetRegistrationInlineKeyboard() {
-        List<InlineKeyboardButton> buttonList = new ArrayList<>();
-        Collections.addAll(buttonList,
-                InlineKeyboardButton.builder()
-                        .callbackData(ResetRegistrationCallbackQueryTypes.YES.toString())
-                        .text("Да")
-                        .build(),
-                InlineKeyboardButton.builder()
-                        .callbackData(ResetRegistrationCallbackQueryTypes.NO.toString())
-                        .text("Нет")
-                        .build()
-        );
-        InlineKeyboardRow inlineKeyboardRow = new InlineKeyboardRow(buttonList);
-        return InlineKeyboardMarkup
-                .builder()
-                .keyboardRow(inlineKeyboardRow)
-                .build();
-    }
-
-    private InlineKeyboardMarkup getDayOfWeekSelectInlineKeyboard(ListLessonResponse lessons) {
-        List<String> weekDays = new ArrayList<>();
-        List<InlineKeyboardRow> keyboardRows = new ArrayList<>();
-        for(LessonResponse lessonResponse : lessons.getLessonResponses()) {
-            if(!weekDays.contains(lessonResponse.getWeekDay())) {
-                weekDays.add(lessonResponse.getWeekDay());
-            }
-        }
-        sortDaysOfWeek(weekDays);
-        for(String weekDay : weekDays) {
-            keyboardRows.add(new InlineKeyboardRow(
-                    InlineKeyboardButton.builder()
-                            .text(weekDay)
-                            .callbackData("weekDay." + weekDay).build()
-            ));
-        }
-        return InlineKeyboardMarkup.builder()
-                .keyboard(keyboardRows)
-                .build();
-    }
-    private void sortDaysOfWeek(List<String> days) {
-        List<String> weekOrder = List.of(
-                "ПОНЕДЕЛЬНИК", "ВТОРНИК", "СРЕДА", "ЧЕТВЕРГ", "ПЯТНИЦА", "СУББОТА", "ВОСКРЕСЕНЬЕ"
-        );
-
-        days.sort(Comparator.comparingInt(day -> weekOrder.indexOf(day.toUpperCase())));
-    }
 
 }
