@@ -14,7 +14,6 @@ import com.vsu_schedule.telegram_service.feign.LessonFeignClient;
 import com.vsu_schedule.telegram_service.feign.TeacherFeignClient;
 import com.vsu_schedule.telegram_service.repository.BotUserRepository;
 import jakarta.transaction.Transactional;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,13 +29,11 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageRe
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
-import org.telegram.telegrambots.meta.api.objects.chat.Chat;
 
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static com.vsu_schedule.telegram_service.botapi.keyboard.MessageKeyboards.*;
 
@@ -141,7 +138,7 @@ public class BotCallbackQueryService {
                 .findFirst()
                 .orElse(null);
         deleteTeacherDescriptionImage(callbackQuery.getMessage().getChatId());
-        if(selectedTeacher.getImgLink() != null ) {
+        if((selectedTeacher != null) && (selectedTeacher.getImgLink() != null)) {
             InputFile image = getImageByLink(selectedTeacher.getImgLink());
             if(image != null){
                 SendPhoto sendPhoto = SendPhoto.builder()
@@ -158,9 +155,9 @@ public class BotCallbackQueryService {
     }
 
     private void deleteTeacherDescriptionImage(Long chatId) {
-        if(sendPhotoMessageIdCache.getLastMessageId() != null) {
+        if(sendPhotoMessageIdCache.get(chatId) != null) {
             DeleteMessage deleteMessage = DeleteMessage.builder()
-                    .messageId(sendPhotoMessageIdCache.getLastMessageId())
+                    .messageId(sendPhotoMessageIdCache.get(chatId))
                     .chatId(chatId)
                     .build();
             applicationEventPublisher.publishEvent(new TelegramActionEvent(this,deleteMessage));
@@ -197,6 +194,7 @@ public class BotCallbackQueryService {
     public BotApiMethod<?> handleScheduleBackCallBackQuery(CallbackQuery query) {
         answerCallBackQuery(query);
         teacherSessionStore.remove(query.getFrom().getId());
+        sendPhotoMessageIdCache.remove(query.getMessage().getChatId());
         Optional<BotUser> opt_user = botUserRepository.findByTelegramId(query.getFrom().getId());
         if(opt_user.isPresent()) {
             BotUser user = opt_user.get();
@@ -248,7 +246,6 @@ public class BotCallbackQueryService {
         return sb.toString();
     }
 
-
     private HashMap<Integer,TeacherResponse> getTeachersForLessons(ListLessonResponse listLessonResponse) {
         HashMap<Integer,TeacherResponse> teacherResponseById = new HashMap<>();
         for(LessonResponse lesson : listLessonResponse.getLessonResponses()) {
@@ -258,7 +255,6 @@ public class BotCallbackQueryService {
         }
         return teacherResponseById;
     }
-
 
     private void removeInlineMarkup(CallbackQuery callbackQuery) {
         answerCallBackQuery(callbackQuery);

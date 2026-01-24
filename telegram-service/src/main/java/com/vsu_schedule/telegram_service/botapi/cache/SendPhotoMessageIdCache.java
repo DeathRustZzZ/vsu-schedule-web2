@@ -1,12 +1,24 @@
 package com.vsu_schedule.telegram_service.botapi.cache;
 
 import lombok.Getter;
-import lombok.Setter;
 import org.springframework.stereotype.Component;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Getter
-@Setter
 @Component
 public class SendPhotoMessageIdCache {
-    private Integer lastMessageId;
+    private final Map<Long, Integer> storage = new ConcurrentHashMap<>();
+
+    public void put(Long telegramId, Integer messageId) {
+        storage.put(telegramId,messageId);
+    }
+
+    public void remove(Long chatId) {
+        storage.remove(chatId);
+    }
+
+    public Integer get(Long chatId) {
+        return storage.get(chatId);
+    }
 }

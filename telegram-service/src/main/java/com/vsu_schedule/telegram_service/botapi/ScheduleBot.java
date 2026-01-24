@@ -23,6 +23,7 @@ import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
@@ -77,7 +78,8 @@ public class ScheduleBot implements SpringLongPollingBot, LongPollingSingleThrea
     @EventListener
     public void onTelegramSendPhotoEvent(TelegramSendPhotoEvent event) {
         try {
-            sendPhotoMessageIdCache.setLastMessageId(telegramClient.execute(event.getMethod()).getMessageId());
+            Message message = telegramClient.execute(event.getMethod());
+            sendPhotoMessageIdCache.put(message.getChatId(),message.getMessageId());
         } catch (TelegramApiException e) {
             log.error(e.getMessage());
         }

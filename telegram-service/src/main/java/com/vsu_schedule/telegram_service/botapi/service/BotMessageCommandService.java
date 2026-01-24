@@ -67,7 +67,6 @@ public class BotMessageCommandService {
             BotUser user = opt_user.get();
             if(user.getGroupId() == null || user.getSubgroupId() == null)
                 return new SendMessage(chatId, Command.getAnswerTextForUnregisteredUsers(message.getFrom().getUserName()));
-
             ListLessonResponse listLessonResponse = lessonFeignClient.getLessonsByGroupAndSubgroup(user.getGroupId(),user.getSubgroupId());
             SendMessage sendMessage = new SendMessage(chatId,"Выберете день недели");
             sendMessage.setReplyMarkup(getDayOfWeekSelectInlineKeyboard(listLessonResponse));
