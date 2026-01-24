@@ -1,12 +1,15 @@
 package com.vsu_schedule.telegram_service.botapi;
 
 
+import com.vsu_schedule.telegram_service.botapi.cache.LastMessageIdCache;
 import com.vsu_schedule.telegram_service.botapi.cache.SendPhotoMessageIdCache;
 import com.vsu_schedule.telegram_service.botapi.command.HelpCommand;
 import com.vsu_schedule.telegram_service.botapi.command.RegisterCommand;
 import com.vsu_schedule.telegram_service.botapi.command.ScheduleCommand;
 import com.vsu_schedule.telegram_service.botapi.command.StartCommand;
 import com.vsu_schedule.telegram_service.botapi.config.BotConfig;
+import com.vsu_schedule.telegram_service.botapi.event.TelegramActionEvent;
+import com.vsu_schedule.telegram_service.botapi.event.TelegramSendPhotoEvent;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +49,9 @@ public class ScheduleBot implements SpringLongPollingBot, LongPollingSingleThrea
 
     @Autowired
     private SendPhotoMessageIdCache sendPhotoMessageIdCache;
+
+    @Autowired
+    private LastMessageIdCache lastMessageIdCache;
 
     private final BotConfig botConfig;
 
@@ -100,7 +106,8 @@ public class ScheduleBot implements SpringLongPollingBot, LongPollingSingleThrea
         try {
             BotApiMethod<?> apiMethod = telegramFacade.handleUpdate(update);
             if (Objects.nonNull(apiMethod)) {
-                telegramClient.execute(apiMethod);
+                Message message =((Message)telegramClient.execute(apiMethod));
+                lastMessageIdCache.put(message.getChatId(),message.getMessageId());
             }
         } catch (TelegramApiException e) {
             log.error(e.getMessage());

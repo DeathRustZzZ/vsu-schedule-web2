@@ -1,8 +1,7 @@
-package com.vsu_schedule.telegram_service.botapi;
+package com.vsu_schedule.telegram_service.botapi.event;
 
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
-import org.telegram.telegrambots.meta.api.methods.send.SendMediaBotMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 
 @Getter

@@ -1,8 +1,8 @@
 package com.vsu_schedule.telegram_service.botapi.service;
 
 
-import com.vsu_schedule.telegram_service.botapi.TelegramActionEvent;
-import com.vsu_schedule.telegram_service.botapi.TelegramSendPhotoEvent;
+import com.vsu_schedule.telegram_service.botapi.event.TelegramActionEvent;
+import com.vsu_schedule.telegram_service.botapi.event.TelegramSendPhotoEvent;
 import com.vsu_schedule.telegram_service.botapi.cache.SendPhotoMessageIdCache;
 import com.vsu_schedule.telegram_service.botapi.cache.TeacherSessionStore;
 import com.vsu_schedule.telegram_service.botapi.callback_query_types.ResetRegistrationCallbackQueryTypes;

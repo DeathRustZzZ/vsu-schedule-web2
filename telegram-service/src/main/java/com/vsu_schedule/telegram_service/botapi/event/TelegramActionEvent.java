@@ -1,4 +1,4 @@
-package com.vsu_schedule.telegram_service.botapi;
+package com.vsu_schedule.telegram_service.botapi.event;
 
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
