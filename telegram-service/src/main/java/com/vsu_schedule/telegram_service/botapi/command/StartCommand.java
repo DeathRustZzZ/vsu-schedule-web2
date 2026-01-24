@@ -13,8 +13,9 @@ public class StartCommand extends BotCommand implements Command {
     }
 
     public String getAnswer(Message message) {
-        return "Здравствуйте,"+message.getFrom().getFirstName()+"!\n"
-                + "Выберете команду в меню.";
+        return String.format("👋 Здравствуйте, %s!\n\n" +
+                        "Рад вас видеть. Выберите нужную команду в меню, чтобы начать работу ⬇️",
+                message.getFrom().getFirstName());
     }
 
     public static String getCommandName(){

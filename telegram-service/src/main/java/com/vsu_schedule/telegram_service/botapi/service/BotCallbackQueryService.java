@@ -34,6 +34,8 @@ import org.telegram.telegrambots.meta.api.objects.InputFile;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.vsu_schedule.telegram_service.botapi.keyboard.MessageKeyboards.*;
 
@@ -216,9 +218,15 @@ public class BotCallbackQueryService {
     }
 
     private String buildTeacherDescriptionMessage(TeacherResponse teacher) {
-        return String.format("%s\n", teacher.getFullname()) +
-                String.format("Квалификация: %s\n", teacher.getQualification()) +
-                String.format("Описание: %s\n", teacher.getDescription());
+        return Stream.of(
+                        teacher.getFullname(),
+                        (teacher.getQualification() != null && !teacher.getQualification().isBlank())
+                                ? "Квалификация: " + teacher.getQualification() : null,
+                        (teacher.getDescription() != null && !teacher.getDescription().isBlank())
+                                ? "Описание: " + teacher.getDescription() : null
+                )
+                .filter(s -> s != null && !s.isBlank())
+                .collect(Collectors.joining("\n"));
 
     }
 
