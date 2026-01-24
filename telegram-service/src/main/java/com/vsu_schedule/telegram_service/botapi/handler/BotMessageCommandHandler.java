@@ -15,6 +15,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 
 
@@ -36,13 +37,13 @@ public class BotMessageCommandHandler {
     public BotApiMethod<?> handle(Message message) {
         String commandName = message.getText();
         if(lastMessageIdCache.get(message.getChatId()) != null){
-            deleteLastMessage(message.getChatId());
+            deleteLastMessageKeyboard(message.getChatId());
         }
         if(teacherSessionStore.get(message.getFrom().getId()) != null) {
-            deleteLastSendPhotoMessage(message.getChatId());
             teacherSessionStore.remove(message.getFrom().getId());
         }
         if(sendPhotoMessageIdCache.get(message.getChatId()) != null) {
+            deleteLastSendPhotoMessage(message.getChatId());
             sendPhotoMessageIdCache.remove(message.getChatId());
         }
         if (commandName.equals(StartCommand.getCommandName())) {
@@ -60,12 +61,12 @@ public class BotMessageCommandHandler {
         return null;
     }
 
-    private void deleteLastMessage(Long chatId) {
-        DeleteMessage deleteMessage = DeleteMessage.builder()
+    private void deleteLastMessageKeyboard(Long chatId) {
+        EditMessageReplyMarkup editMessageReplyMarkup = EditMessageReplyMarkup.builder()
                 .messageId(lastMessageIdCache.get(chatId))
                 .chatId(chatId)
                 .build();
-        applicationEventPublisher.publishEvent(new TelegramActionEvent(this,deleteMessage));
+        applicationEventPublisher.publishEvent(new TelegramActionEvent(this,editMessageReplyMarkup));
     }
     private void deleteLastSendPhotoMessage(Long chatId) {
         DeleteMessage deleteMessage = DeleteMessage.builder()
