@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<!--=== Coding by CodingLab | www.codinglabweb.com === -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!----======== CSS ======== -->
+    <link rel="stylesheet" href="css/styleVsuAdmin.css">
+     
+    <!----===== Iconscout CSS ===== -->
+    <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.0/css/line.css">
+
+    <title>Admin Dashboard Panel</title> 
+</head>
+<body>
+    <nav>
+        <div class="logo-name">
+
+            <span class="logo_name">VSUadmin</span>
+        </div>
+
+        <div class="menu-items">
+            <ul class="nav-links">
+                <li><a href="#">
+                    <i class="uil uil-share"></i>
+                    <span class="link-name">Share</span>
+                </a></li>
+            </ul>
+            
+            <ul class="logout-mode">
+                <li><a id="logoutBtn">
+                    <i class="uil uil-signout"></i>
+                    <span class="link-name">Logout</span>
+                </a></li>
+
+                <li class="mode">
+                    <a href="#">
+                        <i class="uil uil-moon"></i>
+                    <span class="link-name">Dark Mode</span>
+                </a>
+
+                <div class="mode-toggle">
+                  <span class="switch"></span>
+                </div>
+            </li>
+            </ul>
+        </div>
+    </nav>
+
+    <section class="dashboard">
+        <div class="top">
+            <form class="container container_dark"  enctype="multipart/form-data"  id="upload-container"  >
+                <i class="uil uil-upload"></i>
+                <div class="text">
+                     <input id="file-input" type="file" name="file">
+                     <label class="descr descr_dark" for="file-input">Выберите файл</label>
+                     <span class="descr_src descr_src_dark">или перетащите его сюда</span>
+                </div>
+                <form class="form"  >
+                    <label class="fakult descr_dark" for="facult">Факультеты</label>
+                    <select  id="facult">
+                      <option value="1">ПсихФак</option>
+                      <option value="2">ЮрФак</option>
+                      <option value="3">Фмиит</option>
+                      <option value="4">Фгияк</option>
+                      <option value="5">ХИМБИО</option>
+                      <option value="6">ФИЗКУЛЬТУРЫ И СПОРТА</option>
+                        <option value="7">ПЕДФАК</option>
+                    </select>
+                    <button type="button" value="Submit" class="submit_button" id="submit_button"   >Submit</button>
+              </form>
+           </form>
+        </div> 
+    </section>
+    
+
+    <script src="js/scriptVsuAdmin.js"></script>
+</body>
+</html>

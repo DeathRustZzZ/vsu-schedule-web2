@@ -1,0 +1,41 @@
+server:
+  port: 9899
+
+spring:
+  application:
+    name: telegram-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/telegram-service-db
+    username: admin
+    password: admin
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+
+  liquibase:
+    enabled: true
+    change-log: classpath:/db/changelog/db.changelog-master.xml
+
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+bot:
+  token: 8019302937:AAFlJwTThl-Ucv5cydJj2o9FQH2dvxPT2n0
+
+feign:
+  client:
+    groups:
+      name: schedule-service
+      path: api/v1/groups
+    lessons:
+      name: schedule-service
+      path: api/v1/lessons
+    teachers:
+      name: schedule-service
+      path: api/v1/teachers

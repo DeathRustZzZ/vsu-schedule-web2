@@ -1,0 +1,112 @@
+package com.vsuscheduleweb.services;
+
+
+import com.vsuscheduleweb.Exceptions.FileException;
+import com.vsuscheduleweb.Exceptions.FileIsEmptyException;
+import com.vsuscheduleweb.entity.Group;
+import com.vsuscheduleweb.entity.Lesson;
+import com.vsuscheduleweb.entity.Subgroup;
+import com.vsuscheduleweb.entity.Teacher;
+import com.vsuscheduleweb.parser.Parser;
+import com.vsuscheduleweb.repositories.GroupRepository;
+import com.vsuscheduleweb.repositories.LessonRepository;
+import com.vsuscheduleweb.repositories.TeacherRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.IncorrectResultSizeDataAccessException;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
+import java.io.*;
+import java.util.Locale;
+import java.util.Optional;
+
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class ScheduleService {
+
+    private final Parser parser;
+
+    private final TeacherRepository teacherRepository;
+
+    private final GroupRepository groupRepository;
+
+    private final LessonRepository lessonRepository;
+
+    public void uploadSchedule(MultipartFile multipartFile, String faculty) {
+        lessonRepository.deleteAllWhereFacultyEquals(faculty);
+        File file = saveFile(multipartFile);
+        parser.parse(file, faculty);
+        List<Group> groups = parser.getGroups();
+        List<Lesson> lessons = parser.getLessons();
+        List<Teacher> teachers = parser.getTeachers();
+        for (Lesson lesson : lessons) {
+            lesson.setFaculty(faculty);
+            lesson.setTeacherId(-1);
+        }
+        processTeachers(teachers);
+        processGroups(groups,faculty);
+
+    }
+
+    private File saveFile(MultipartFile multipartFile) {
+        String path = System.getProperty("user.dir") + "\\schedule-service\\src\\main\\temp";
+        if (!multipartFile.isEmpty()) {
+            File file = new File(path + "\\" + multipartFile.getOriginalFilename());
+            if (file.exists()) file.delete();
+            file = new File(path + "\\" + multipartFile.getOriginalFilename());
+            try {
+                FileOutputStream fileOutputStream = new FileOutputStream(file);
+                fileOutputStream.write(multipartFile.getBytes());
+                fileOutputStream.close();
+                return file;
+            } catch (Exception e) {
+                throw new FileException(e.getMessage());
+            }
+        } else throw new FileIsEmptyException("file cannot be empty.");
+    }
+
+    private void processTeachers(List<Teacher> teachers) {
+        teachers.forEach(teacher -> {
+            try {
+                Optional<Teacher> opt_teacher = teacherRepository.findByInitialsAndLastname(teacher.getInitials(),
+                        teacher.getLastname().toUpperCase(Locale.ROOT));
+                if (opt_teacher.isPresent()) {
+                    Teacher teacherDb = opt_teacher.get();
+                    teacher.getLessons().forEach(lesson -> {
+                        lesson.setTeacherId(teacherDb.getId());
+                    });
+                    teacherDb.setLessons(teacher.getLessons());
+                    teacherRepository.save(teacherDb);
+                }
+            } catch (IncorrectResultSizeDataAccessException e) {
+                log.error(e.getMessage());
+            }
+        });
+
+    }
+
+    private void processGroups(List<Group> groups, String faculty) {
+        for (Group group : groups) {
+            group.setId(group.getId().replace('/', '.'));
+            group.setFaculty(faculty);
+            for (int j = 0; j < group.getCommonLessons().size(); j++) {
+                Lesson lesson = group.getCommonLessons().get(j);
+                lesson.setGroupId(group.getId());
+            }
+            for (int j = 0; j < group.getSubgroups().size(); j++) {
+                Subgroup subgroup = group.getSubgroups().get(j);
+                subgroup.setGroupId(group.getId());
+                subgroup.setFaculty(faculty);
+                for (int k = 0; k < subgroup.getLessons().size(); k++) {
+                    Lesson lesson = subgroup.getLessons().get(k);
+                    lesson.setSubgroupId(subgroup.getId());
+                }
+            }
+        }
+        groupRepository.saveAll(groups);
+    }
+}
+
