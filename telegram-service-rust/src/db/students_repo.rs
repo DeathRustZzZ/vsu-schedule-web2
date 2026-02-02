@@ -6,28 +6,21 @@ use crate::domain::student::Student;
 pub async fn find_by_telegram_id(pool: &PgPool, telegram_id: i64) -> anyhow::Result<Option<Student>> {
     debug!("Запрос на поиск студента с telegram_id={}", telegram_id);
 
-    let row = sqlx::query!(
+    let row = sqlx::query_as::<_, Student>(
         r#"
         SELECT id, telegram_id, faculty, group_name, study_form, created_at
         FROM students
         WHERE telegram_id = $1
-        "#,
-        telegram_id
+        "#
     )
-        .fetch_optional(pool)
-        .await;
+    .bind(telegram_id)
+    .fetch_optional(pool)
+    .await;
 
     match row {
-        Ok(Some(r)) => {
-            info!("Студент найден: id={}, telegram_id={}", r.id, r.telegram_id);
-            Ok(Some(Student {
-                id: r.id,
-                telegram_id: r.telegram_id,
-                faculty: r.faculty,
-                group_name: r.group_name,
-                study_form: r.study_form,
-                created_at: r.created_at,
-            }))
+        Ok(Some(student)) => {
+            info!("Студент найден: id={}, telegram_id={}", student.id, student.telegram_id);
+            Ok(Some(student))
         }
         Ok(None) => {
             info!("Студент с telegram_id={} не найден.", telegram_id);
@@ -53,31 +46,24 @@ pub async fn insert(
         telegram_id, faculty, group_name, study_form
     );
 
-    let res = sqlx::query!(
+    let res = sqlx::query_as::<_, Student>(
         r#"
         INSERT INTO students (telegram_id, faculty, group_name, study_form)
         VALUES ($1, $2, $3, $4)
         RETURNING id, telegram_id, faculty, group_name, study_form, created_at
-        "#,
-        telegram_id,
-        faculty,
-        group_name,
-        study_form
+        "#
     )
-        .fetch_one(pool)
-        .await;
+    .bind(telegram_id)
+    .bind(faculty)
+    .bind(group_name)
+    .bind(study_form)
+    .fetch_one(pool)
+    .await;
 
     match res {
-        Ok(r) => {
-            info!("Студент успешно добавлен: id={}, telegram_id={}", r.id, r.telegram_id);
-            Ok(Student {
-                id: r.id,
-                telegram_id: r.telegram_id,
-                faculty: r.faculty,
-                group_name: r.group_name,
-                study_form: r.study_form,
-                created_at: r.created_at,
-            })
+        Ok(student) => {
+            info!("Студент успешно добавлен: id={}, telegram_id={}", student.id, student.telegram_id);
+            Ok(student)
         }
         Err(e) => {
             error!("Ошибка при добавлении студента: {:?}", e);
@@ -96,32 +82,25 @@ pub async fn update(
 ) -> anyhow::Result<Option<Student>> {
     info!("Обновление студента telegram_id={}", telegram_id);
 
-    let res = sqlx::query!(
+    let res = sqlx::query_as::<_, Student>(
         r#"
         UPDATE students
         SET faculty = $2, group_name = $3, study_form = $4
         WHERE telegram_id = $1
         RETURNING id, telegram_id, faculty, group_name, study_form, created_at
-        "#,
-        telegram_id,
-        faculty,
-        group_name,
-        study_form
+        "#
     )
-        .fetch_optional(pool)
-        .await;
+    .bind(telegram_id)
+    .bind(faculty)
+    .bind(group_name)
+    .bind(study_form)
+    .fetch_optional(pool)
+    .await;
 
     match res {
-        Ok(Some(r)) => {
-            info!("Студент обновлён: id={}, telegram_id={}", r.id, r.telegram_id);
-            Ok(Some(Student {
-                id: r.id,
-                telegram_id: r.telegram_id,
-                faculty: r.faculty,
-                group_name: r.group_name,
-                study_form: r.study_form,
-                created_at: r.created_at,
-            }))
+        Ok(Some(student)) => {
+            info!("Студент обновлён: id={}, telegram_id={}", student.id, student.telegram_id);
+            Ok(Some(student))
         }
         Ok(None) => {
             info!("Студент с telegram_id={} не найден для обновления.", telegram_id);
@@ -138,15 +117,15 @@ pub async fn update(
 pub async fn delete(pool: &PgPool, telegram_id: i64) -> anyhow::Result<u64> {
     info!("Удаление студента telegram_id={}", telegram_id);
 
-    let res = sqlx::query!(
+    let res = sqlx::query(
         r#"
         DELETE FROM students
         WHERE telegram_id = $1
-        "#,
-        telegram_id
+        "#
     )
-        .execute(pool)
-        .await;
+    .bind(telegram_id)
+    .execute(pool)
+    .await;
 
     match res {
         Ok(result) => {

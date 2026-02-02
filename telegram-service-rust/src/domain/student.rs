@@ -1,8 +1,9 @@
 //src/domain/student.rs
 use chrono::{DateTime, Utc};
+use sqlx::FromRow;
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromRow)]
 pub struct Student {
     pub id: Uuid,
     pub telegram_id: i64,

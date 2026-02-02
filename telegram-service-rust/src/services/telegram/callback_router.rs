@@ -43,7 +43,7 @@ pub async fn route_callback(
         // Пытаемся распарсить как CallbackData
         match CallbackData::from_str(&data) {
             Ok(callback) => {
-                if let Err(e) = handle_callback_data(bot, q, db, callback).await {
+                if let Err(e) = handle_callback_data(&bot, q, db, callback).await {
                     warn!("Ошибка при обработке callback '{}': {:?}", data, e);
                 }
                 let _ = bot.answer_callback_query(callback_query_id).await;
@@ -66,7 +66,7 @@ pub async fn route_callback(
 
 /// Обработчик распарсённых callback-данных
 async fn handle_callback_data(
-    bot: Bot,
+    bot: &Bot,
     q: CallbackQuery,
     db: Arc<DbFacade>,
     callback: CallbackData,
@@ -76,21 +76,21 @@ async fn handle_callback_data(
     match callback {
         // Основные команды
         TechButton(btn) => {
-            registration::handlers::handle_tech_button(bot, q, db, btn).await?;
+            registration::handlers::handle_tech_button(bot.clone(), q, db, btn).await?;
         }
 
         // Регистрация
         Faculty(faculty) => {
-            registration::handlers::handle_faculty_choice(bot, q, db, faculty).await?;
+            registration::handlers::handle_faculty_choice(bot.clone(), q, db, faculty).await?;
         }
         StudyForm(form) => {
-            registration::handlers::handle_study_form(bot, q, db, form).await?;
+            registration::handlers::handle_study_form(bot.clone(), q, db, form).await?;
         }
         Course(course) => {
-            registration::handlers::handle_course(bot, q, db, course).await?;
+            registration::handlers::handle_course(bot.clone(), q, db, course).await?;
         }
         MitGroup(group) => {
-            registration::handlers::handle_group(bot, q, db, group).await?;
+            registration::handlers::handle_group(bot.clone(), q, db, group).await?;
         }
     }
 

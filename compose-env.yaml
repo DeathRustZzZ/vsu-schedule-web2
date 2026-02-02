@@ -9,6 +9,8 @@ networks:
 services:
   schedule-service:
     image: schedule-service:latest
+    build:
+      context: ./schedule-service
     ports:
       - '9898:9898'
     networks:
@@ -18,10 +20,13 @@ services:
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=admin
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   telegram-service-rust:
     image: telegram-service-rust:latest
+    build:
+      context: ./telegram-service-rust
     networks:
       - vsu-schedule-network
     environment:
@@ -29,7 +34,8 @@ services:
       - DATABASE_URL=postgresql://admin:admin@students-db:5432/students-db
       - RUST_LOG=info
     depends_on:
-      - students-db
+      students-db:
+        condition: service_healthy
 
   db:
     container_name: db
@@ -39,10 +45,16 @@ services:
     volumes:
       - ./init-scripts-db:/docker-entrypoint-initdb.d
     environment:
+      POSTGRES_DB: schedule-db
       POSTGRES_PASSWORD: admin
       POSTGRES_USER: admin
     networks:
       - vsu-schedule-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d schedule-db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   students-db:
     container_name: students-db
@@ -57,3 +69,8 @@ services:
       POSTGRES_USER: admin
     networks:
       - vsu-schedule-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d students-db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
