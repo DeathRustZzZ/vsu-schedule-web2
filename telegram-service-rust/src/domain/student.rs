@@ -10,5 +10,7 @@ pub struct Student {
     pub faculty: String,
     pub group_name: String,
     pub study_form: String,
+    pub course: Option<String>,
+    pub username: Option<String>,
     pub created_at: DateTime<Utc>,
 }

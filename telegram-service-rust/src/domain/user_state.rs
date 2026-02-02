@@ -15,6 +15,8 @@ pub struct UserState {
     pub course: Option<String>,
     pub ui_chat_id: Option<i64>,
     pub ui_message_id: Option<i32>,
+    pub reply_message_id: Option<i32>,
+    pub reply_state: Option<String>,
     pub created_at: Option<chrono::NaiveDateTime>,
     pub updated_at: Option<chrono::NaiveDateTime>,
 }
@@ -35,8 +37,4 @@ impl UserState {
         self.course.as_deref()
     }
 
-    /// Проверить, заполнены ли все необходимые данные для регистрации
-    pub fn is_complete(&self) -> bool {
-        self.faculty.is_some() && self.study_form.is_some() && self.course.is_some()
-    }
 }
