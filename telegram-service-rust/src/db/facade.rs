@@ -95,6 +95,15 @@ impl DbFacade {
         user_states_repo::find_by_telegram_id(&self.pool, telegram_id).await
     }
 
+    /// Получить UI message_id (chat_id, message_id)
+    pub async fn get_ui_message(&self, telegram_id: i64) -> anyhow::Result<Option<(i64, i32)>> {
+        let state = self.get_user_state(telegram_id).await?;
+        Ok(state.and_then(|s| {
+            s.ui_chat_id
+                .and_then(|chat_id| s.ui_message_id.map(|msg_id| (chat_id, msg_id)))
+        }))
+    }
+
     /// Создать состояние пользователя (начало регистрации)
     pub async fn create_user_state(&self, telegram_id: i64) -> anyhow::Result<UserState> {
         user_states_repo::insert(&self.pool, telegram_id).await
@@ -103,6 +112,16 @@ impl DbFacade {
     /// Сбросить состояние пользователя (новая регистрация)
     pub async fn reset_user_state(&self, telegram_id: i64) -> anyhow::Result<UserState> {
         user_states_repo::reset(&self.pool, telegram_id).await
+    }
+
+    /// Сохранить UI message_id
+    pub async fn set_ui_message(
+        &self,
+        telegram_id: i64,
+        chat_id: i64,
+        message_id: i32,
+    ) -> anyhow::Result<UserState> {
+        user_states_repo::update_ui_message(&self.pool, telegram_id, chat_id, message_id).await
     }
 
     /// Обновить факультет в состоянии

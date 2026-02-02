@@ -13,6 +13,8 @@ pub struct UserState {
     pub faculty: Option<String>,
     pub study_form: Option<String>,
     pub course: Option<String>,
+    pub ui_chat_id: Option<i64>,
+    pub ui_message_id: Option<i32>,
     pub created_at: Option<chrono::NaiveDateTime>,
     pub updated_at: Option<chrono::NaiveDateTime>,
 }
@@ -38,4 +40,3 @@ impl UserState {
         self.faculty.is_some() && self.study_form.is_some() && self.course.is_some()
     }
 }
-

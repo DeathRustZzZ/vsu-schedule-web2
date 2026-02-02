@@ -5,6 +5,7 @@ use crate::services::telegram::registration::keyboards::{
 use crate::domain::{faculty::Faculty, study_form::StudyForm, course::Course, buttons::TechButton};
 use crate::domain::groups::mit::MitGroup;
 use crate::db::facade::DbFacade;
+use crate::services::telegram::ui::render_ui;
 use std::sync::Arc;
 use log::{info, error};
 
@@ -17,8 +18,8 @@ pub async fn handle_tech_button(
 ) -> Result<(), teloxide::RequestError> {
     match btn {
         TechButton::Register => handle_register(bot, q, db).await?,
-        TechButton::MySchedule => handle_schedule(bot, q).await?,
-        TechButton::ChooseGroup => handle_choose_group(bot, q).await?,
+        TechButton::MySchedule => handle_schedule(bot, q, db).await?,
+        TechButton::ChooseGroup => handle_choose_group(bot, q, db).await?,
     }
     Ok(())
 }
@@ -30,6 +31,7 @@ pub async fn handle_register(
     db: Arc<DbFacade>,
 ) -> Result<(), teloxide::RequestError> {
     let telegram_id = q.from.id.0 as i64;
+    let chat_id = q.message.as_ref().map(|m| m.chat().id).unwrap_or(q.from.id.into());
     if let Err(err) = db.reset_user_state(telegram_id).await {
         error!("Ошибка при сбросе состояния пользователя {}: {:?}", telegram_id, err);
         bot.send_message(
@@ -40,25 +42,57 @@ pub async fn handle_register(
         return Ok(());
     }
 
-    bot.send_message(q.from.id, "✨ Начинаем регистрацию!\nВыбери факультет 📚")
-        .reply_markup(faculty_keyboard())
-        .await?;
+    render_ui(
+        &bot,
+        db.as_ref(),
+        telegram_id,
+        chat_id,
+        q.message.as_ref().map(|m| m.id()),
+        "✨ Начинаем регистрацию!\nВыбери факультет 📚",
+        Some(faculty_keyboard()),
+    )
+    .await?;
     
     Ok(())
 }
 
 /// Показать расписание пользователя
-pub async fn handle_schedule(bot: Bot, q: CallbackQuery) -> Result<(), teloxide::RequestError> {
-    bot.send_message(q.from.id, "📅 Вот твоё расписание...\n\n(функция в разработке)")
-        .await?;
+pub async fn handle_schedule(
+    bot: Bot,
+    q: CallbackQuery,
+    db: Arc<DbFacade>,
+) -> Result<(), teloxide::RequestError> {
+    let chat_id = q.message.as_ref().map(|m| m.chat().id).unwrap_or(q.from.id.into());
+    render_ui(
+        &bot,
+        db.as_ref(),
+        q.from.id.0 as i64,
+        chat_id,
+        q.message.as_ref().map(|m| m.id()),
+        "📅 Вот твоё расписание...\n\n(функция в разработке)",
+        None,
+    )
+    .await?;
     Ok(())
 }
 
 /// Позволить выбрать другую группу
-pub async fn handle_choose_group(bot: Bot, q: CallbackQuery) -> Result<(), teloxide::RequestError> {
-    bot.send_message(q.from.id, "🔎 Выбери группу")
-        .reply_markup(mit_group_keyboard())
-        .await?;
+pub async fn handle_choose_group(
+    bot: Bot,
+    q: CallbackQuery,
+    db: Arc<DbFacade>,
+) -> Result<(), teloxide::RequestError> {
+    let chat_id = q.message.as_ref().map(|m| m.chat().id).unwrap_or(q.from.id.into());
+    render_ui(
+        &bot,
+        db.as_ref(),
+        q.from.id.0 as i64,
+        chat_id,
+        q.message.as_ref().map(|m| m.id()),
+        "🔎 Выбери группу",
+        Some(mit_group_keyboard()),
+    )
+    .await?;
     Ok(())
 }
 
@@ -72,6 +106,7 @@ pub async fn handle_faculty_choice(
     info!("Пользователь {} выбрал факультет: {:?}", q.from.id, faculty);
 
     let telegram_id = q.from.id.0 as i64;
+    let chat_id = q.message.as_ref().map(|m| m.chat().id).unwrap_or(q.from.id.into());
     if let Err(err) = db.set_user_faculty(telegram_id, faculty.title()).await {
         error!("Ошибка при сохранении факультета {}: {:?}", telegram_id, err);
         bot.send_message(
@@ -82,11 +117,15 @@ pub async fn handle_faculty_choice(
         return Ok(());
     }
     
-    bot.send_message(
-        q.from.id,
-        format!("✅ Ты выбрал: {}\n\n📝 Теперь выбери форму обучения:", faculty.title()),
+    render_ui(
+        &bot,
+        db.as_ref(),
+        telegram_id,
+        chat_id,
+        q.message.as_ref().map(|m| m.id()),
+        &format!("✅ Ты выбрал: {}\n\n📝 Теперь выбери форму обучения:", faculty.title()),
+        Some(study_form_keyboard()),
     )
-    .reply_markup(study_form_keyboard())
     .await?;
     
     Ok(())
@@ -102,6 +141,7 @@ pub async fn handle_study_form(
     info!("Пользователь {} выбрал форму обучения: {:?}", q.from.id, form);
 
     let telegram_id = q.from.id.0 as i64;
+    let chat_id = q.message.as_ref().map(|m| m.chat().id).unwrap_or(q.from.id.into());
     if let Err(err) = db.set_user_study_form(telegram_id, form.title()).await {
         error!("Ошибка при сохранении формы обучения {}: {:?}", telegram_id, err);
         bot.send_message(
@@ -112,11 +152,15 @@ pub async fn handle_study_form(
         return Ok(());
     }
     
-    bot.send_message(
-        q.from.id,
-        format!("✅ Форма: {}\n\n📚 Теперь выбери курс:", form.title()),
+    render_ui(
+        &bot,
+        db.as_ref(),
+        telegram_id,
+        chat_id,
+        q.message.as_ref().map(|m| m.id()),
+        &format!("✅ Форма: {}\n\n📚 Теперь выбери курс:", form.title()),
+        Some(course_keyboard()),
     )
-    .reply_markup(course_keyboard())
     .await?;
     
     Ok(())
@@ -132,6 +176,7 @@ pub async fn handle_course(
     info!("Пользователь {} выбрал курс: {:?}", q.from.id, course);
 
     let telegram_id = q.from.id.0 as i64;
+    let chat_id = q.message.as_ref().map(|m| m.chat().id).unwrap_or(q.from.id.into());
     if let Err(err) = db.set_user_course(telegram_id, course.title()).await {
         error!("Ошибка при сохранении курса {}: {:?}", telegram_id, err);
         bot.send_message(
@@ -142,11 +187,15 @@ pub async fn handle_course(
         return Ok(());
     }
     
-    bot.send_message(
-        q.from.id,
-        format!("✅ Курс: {}\n\n👥 Теперь выбери свою группу:", course.title()),
+    render_ui(
+        &bot,
+        db.as_ref(),
+        telegram_id,
+        chat_id,
+        q.message.as_ref().map(|m| m.id()),
+        &format!("✅ Курс: {}\n\n👥 Теперь выбери свою группу:", course.title()),
+        Some(mit_group_keyboard()),
     )
-    .reply_markup(mit_group_keyboard())
     .await?;
     
     Ok(())
@@ -160,6 +209,7 @@ pub async fn handle_group(
     group: MitGroup,
 ) -> Result<(), teloxide::RequestError> {
     let telegram_id = q.from.id.0 as i64;
+    let chat_id = q.message.as_ref().map(|m| m.chat().id).unwrap_or(q.from.id.into());
     
     info!("Пользователь {} выбрал группу: {:?}", q.from.id, group);
     
@@ -187,9 +237,13 @@ pub async fn handle_group(
     {
         Ok(student) => {
             info!("Студент {} успешно зарегистрирован", telegram_id);
-            bot.send_message(
-                q.from.id,
-                format!(
+            render_ui(
+                &bot,
+                db.as_ref(),
+                telegram_id,
+                chat_id,
+                q.message.as_ref().map(|m| m.id()),
+                &format!(
                     "🎉 Ты успешно зарегистрирован!\n\n\
                     📚 Факультет: {}\n\
                     📝 Форма: {}\n\
@@ -197,6 +251,7 @@ pub async fn handle_group(
                     Теперь ты можешь просматривать расписание!",
                     student.faculty, student.study_form, student.group_name
                 ),
+                None,
             )
             .await?;
         }

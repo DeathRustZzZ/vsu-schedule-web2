@@ -2,10 +2,10 @@
 //! Диспетчер для удобной обработки команд меню с контекстом
 
 use teloxide::prelude::*;
-use teloxide::types::InlineKeyboardMarkup;
 use crate::domain::menu::MenuCommand;
 use crate::services::telegram::menu;
 use crate::services::telegram::registration;
+use crate::services::telegram::ui::render_ui;
 use crate::db::facade::DbFacade;
 use log::info;
 use std::sync::Arc;
@@ -53,6 +53,7 @@ impl MenuDispatcher {
                 registration::handlers::handle_choose_group(
                     context.bot.clone(),
                     context.query.clone(),
+                    Arc::clone(&context.db),
                 )
                 .await?;
             }
@@ -73,45 +74,46 @@ impl MenuDispatcher {
     async fn show_main_menu(
         context: &MenuCommandContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        Self::edit_or_send(
-            context,
+        render_ui(
+            &context.bot,
+            context.db.as_ref(),
+            context.query.from.id.0 as i64,
+            context.query
+                .message
+                .as_ref()
+                .map(|m| m.chat().id)
+                .unwrap_or(context.query.from.id.into()),
+            context.query.message.as_ref().map(|m| m.id()),
             "🏠 Главное меню\n\nВыберите действие:",
-            menu::menu_two_column_keyboard(&[
+            Some(menu::menu_two_column_keyboard(&[
                 MenuCommand::MyProfile,
                 MenuCommand::MySchedule,
                 MenuCommand::ChooseGroup,
                 MenuCommand::Help,
-            ]),
+            ])),
         )
         .await?;
 
         Ok(())
     }
 
-    /// Показать меню регистрации
-    async fn show_registration_menu(
-        context: &MenuCommandContext,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        context
-            .bot
-            .send_message(
-                context.query.from.id,
-                "📝 *Регистрация*\n\nНачнём процесс регистрации. Выберите факультет:",
-            )
-            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-            .await?;
-
-        Ok(())
-    }
 
     /// Показать профиль
     async fn show_profile(
         context: &MenuCommandContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        Self::edit_or_send(
-            context,
+        render_ui(
+            &context.bot,
+            context.db.as_ref(),
+            context.query.from.id.0 as i64,
+            context.query
+                .message
+                .as_ref()
+                .map(|m| m.chat().id)
+                .unwrap_or(context.query.from.id.into()),
+            context.query.message.as_ref().map(|m| m.id()),
             "👤 Мой профиль\n\n(здесь будут данные профиля)",
-            menu::menu_inline_keyboard(&[MenuCommand::Back]),
+            Some(menu::menu_inline_keyboard(&[MenuCommand::Back])),
         )
         .await?;
 
@@ -122,10 +124,18 @@ impl MenuDispatcher {
     async fn show_schedule(
         context: &MenuCommandContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        Self::edit_or_send(
-            context,
+        render_ui(
+            &context.bot,
+            context.db.as_ref(),
+            context.query.from.id.0 as i64,
+            context.query
+                .message
+                .as_ref()
+                .map(|m| m.chat().id)
+                .unwrap_or(context.query.from.id.into()),
+            context.query.message.as_ref().map(|m| m.id()),
             "📅 Моё расписание\n\n(здесь будет расписание)",
-            menu::menu_inline_keyboard(&[MenuCommand::Back]),
+            Some(menu::menu_inline_keyboard(&[MenuCommand::Back])),
         )
         .await?;
 
@@ -136,10 +146,18 @@ impl MenuDispatcher {
     async fn show_group_selection(
         context: &MenuCommandContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        Self::edit_or_send(
-            context,
+        render_ui(
+            &context.bot,
+            context.db.as_ref(),
+            context.query.from.id.0 as i64,
+            context.query
+                .message
+                .as_ref()
+                .map(|m| m.chat().id)
+                .unwrap_or(context.query.from.id.into()),
+            context.query.message.as_ref().map(|m| m.id()),
             "👥 Выберите группу\n\nДля просмотра расписания выберите нужную группу:",
-            menu::menu_inline_keyboard(&[MenuCommand::Back]),
+            Some(menu::menu_inline_keyboard(&[MenuCommand::Back])),
         )
         .await?;
 
@@ -150,40 +168,26 @@ impl MenuDispatcher {
     async fn show_help(
         context: &MenuCommandContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        context
-            .bot
-            .send_message(
-                context.query.from.id,
-                "❓ Справка\n\n\
-                Этот бот помогает вам:\n\
-                👤 Просматривать свой профиль\n\
-                📅 Смотреть расписание вашей группы\n\
-                👥 Выбирать другие группы для просмотра их расписания\n\n\
-                Используйте меню для удобной навигации.",
-            )
-            .await?;
+        render_ui(
+            &context.bot,
+            context.db.as_ref(),
+            context.query.from.id.0 as i64,
+            context.query
+                .message
+                .as_ref()
+                .map(|m| m.chat().id)
+                .unwrap_or(context.query.from.id.into()),
+            context.query.message.as_ref().map(|m| m.id()),
+            "❓ Справка\n\n\
+Этот бот помогает вам:\n\
+👤 Просматривать свой профиль\n\
+📅 Смотреть расписание вашей группы\n\
+👥 Выбирать другие группы для просмотра их расписания\n\n\
+Используйте меню для удобной навигации.",
+            None,
+        )
+        .await?;
 
-        Ok(())
-    }
-
-    async fn edit_or_send(
-        context: &MenuCommandContext,
-        text: &str,
-        markup: InlineKeyboardMarkup,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(message) = context.query.message.as_ref() {
-            context
-                .bot
-                .edit_message_text(context.query.from.id, message.id(), text)
-                .reply_markup(markup)
-                .await?;
-        } else {
-            context
-                .bot
-                .send_message(context.query.from.id, text)
-                .reply_markup(markup)
-                .await?;
-        }
         Ok(())
     }
 }

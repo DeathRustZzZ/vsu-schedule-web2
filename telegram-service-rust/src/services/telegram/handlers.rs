@@ -2,6 +2,7 @@ use teloxide::prelude::*;
 use crate::db::facade::DbFacade;
 use crate::services::telegram::menu;
 use crate::services::telegram::callback_router;
+use crate::services::telegram::ui::render_ui;
 use std::sync::Arc;
 use log::{info, debug, error};
 
@@ -26,27 +27,44 @@ pub async fn handle_message(
             info!("Пользователь {} найден: {}", telegram_id, student.group_name);
 
             // Приветствие с меню зарегистрированного пользователя
-            bot.send_message(
+            render_ui(
+                &bot,
+                db.as_ref(),
+                telegram_id,
                 msg.chat.id,
-                format!("👋 Привет, {}!\n\n📚 Выберите действие из меню ниже:", student.group_name)
+                None,
+                &format!("👋 Привет, {}!\n\n📚 Выберите действие из меню ниже:", student.group_name),
+                Some(menu::user_menu_inline_keyboard()),
             )
-            .reply_markup(menu::user_menu_inline_keyboard())
             .await?;
         }
         Ok(None) => {
             debug!("Пользователь {} не найден, предлагаем регистрацию", telegram_id);
 
             // Приветствие с предложением регистрации
-            bot.send_message(
+            render_ui(
+                &bot,
+                db.as_ref(),
+                telegram_id,
                 msg.chat.id,
-                "👋 Привет! Ты ещё не зарегистрирован.\n\n📝 Пройди регистрацию, чтобы получить доступ к расписанию!"
+                None,
+                "👋 Привет! Ты ещё не зарегистрирован.\n\n📝 Пройди регистрацию, чтобы получить доступ к расписанию!",
+                Some(menu::main_menu_inline_keyboard()),
             )
-            .reply_markup(menu::main_menu_inline_keyboard())
             .await?;
         }
         Err(err) => {
             error!("Ошибка поиска студента {}: {:?}", telegram_id, err);
-            bot.send_message(msg.chat.id, "❌ Ошибка при обращении к базе. Попробуйте позже.").await?;
+            render_ui(
+                &bot,
+                db.as_ref(),
+                telegram_id,
+                msg.chat.id,
+                None,
+                "❌ Ошибка при обращении к базе. Попробуйте позже.",
+                None,
+            )
+            .await?;
         }
     }
     Ok(())
