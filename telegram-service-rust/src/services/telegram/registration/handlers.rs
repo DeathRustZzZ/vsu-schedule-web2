@@ -50,6 +50,7 @@ pub async fn handle_register(
         q.message.as_ref().map(|m| m.id()),
         "✨ Начинаем регистрацию!\nВыбери факультет 📚",
         Some(faculty_keyboard()),
+        None,
     )
     .await?;
     
@@ -71,6 +72,7 @@ pub async fn handle_schedule(
         q.message.as_ref().map(|m| m.id()),
         "📅 Вот твоё расписание...\n\n(функция в разработке)",
         None,
+        None,
     )
     .await?;
     Ok(())
@@ -91,6 +93,7 @@ pub async fn handle_choose_group(
         q.message.as_ref().map(|m| m.id()),
         "🔎 Выбери группу",
         Some(mit_group_keyboard()),
+        None,
     )
     .await?;
     Ok(())
@@ -125,6 +128,7 @@ pub async fn handle_faculty_choice(
         q.message.as_ref().map(|m| m.id()),
         &format!("✅ Ты выбрал: {}\n\n📝 Теперь выбери форму обучения:", faculty.title()),
         Some(study_form_keyboard()),
+        None,
     )
     .await?;
     
@@ -160,6 +164,7 @@ pub async fn handle_study_form(
         q.message.as_ref().map(|m| m.id()),
         &format!("✅ Форма: {}\n\n📚 Теперь выбери курс:", form.title()),
         Some(course_keyboard()),
+        None,
     )
     .await?;
     
@@ -195,6 +200,7 @@ pub async fn handle_course(
         q.message.as_ref().map(|m| m.id()),
         &format!("✅ Курс: {}\n\n👥 Теперь выбери свою группу:", course.title()),
         Some(mit_group_keyboard()),
+        None,
     )
     .await?;
     
@@ -251,6 +257,7 @@ pub async fn handle_group(
                     Теперь ты можешь просматривать расписание!",
                     student.faculty, student.study_form, student.group_name
                 ),
+                None,
                 None,
             )
             .await?;

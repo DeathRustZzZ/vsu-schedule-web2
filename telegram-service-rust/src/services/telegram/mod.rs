@@ -8,6 +8,7 @@ pub mod menu_examples;
 pub mod callback_router;
 pub mod registration;
 pub mod ui;
+pub mod reply_menu;
 
 use teloxide::prelude::*;
 use crate::db::facade::DbFacade;

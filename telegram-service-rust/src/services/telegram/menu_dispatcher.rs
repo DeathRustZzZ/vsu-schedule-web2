@@ -91,6 +91,7 @@ impl MenuDispatcher {
                 MenuCommand::ChooseGroup,
                 MenuCommand::Help,
             ])),
+            None,
         )
         .await?;
 
@@ -114,6 +115,7 @@ impl MenuDispatcher {
             context.query.message.as_ref().map(|m| m.id()),
             "👤 Мой профиль\n\n(здесь будут данные профиля)",
             Some(menu::menu_inline_keyboard(&[MenuCommand::Back])),
+            None,
         )
         .await?;
 
@@ -136,6 +138,7 @@ impl MenuDispatcher {
             context.query.message.as_ref().map(|m| m.id()),
             "📅 Моё расписание\n\n(здесь будет расписание)",
             Some(menu::menu_inline_keyboard(&[MenuCommand::Back])),
+            None,
         )
         .await?;
 
@@ -158,6 +161,7 @@ impl MenuDispatcher {
             context.query.message.as_ref().map(|m| m.id()),
             "👥 Выберите группу\n\nДля просмотра расписания выберите нужную группу:",
             Some(menu::menu_inline_keyboard(&[MenuCommand::Back])),
+            None,
         )
         .await?;
 
@@ -184,6 +188,7 @@ impl MenuDispatcher {
 📅 Смотреть расписание вашей группы\n\
 👥 Выбирать другие группы для просмотра их расписания\n\n\
 Используйте меню для удобной навигации.",
+            None,
             None,
         )
         .await?;
