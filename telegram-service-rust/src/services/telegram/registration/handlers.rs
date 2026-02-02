@@ -194,8 +194,13 @@ pub async fn handle_group(
 
     let faculty = state.faculty().unwrap_or("МИТ");
     let study_form = state.study_form().unwrap_or("Очная");
+    let course = state.course();
+    let username = q.from.username.as_deref();
 
-    match db.register_student(telegram_id, faculty, group.title(), study_form).await {
+    match db
+        .register_student(telegram_id, faculty, group.title(), study_form, course, username)
+        .await
+    {
         Ok(student) => {
             info!("Студент {} успешно зарегистрирован", telegram_id);
             bot.send_message(

@@ -38,12 +38,24 @@ impl DbFacade {
         faculty: &str,
         group: &str,
         study_form: &str,
+        course: Option<&str>,
+        username: Option<&str>,
     ) -> anyhow::Result<Student> {
         info!(
-            "Регистрация студента: telegram_id={}, faculty={}, group={}, study_form={}",
-            telegram_id, faculty, group, study_form
+            "Регистрация студента: telegram_id={}, faculty={}, group={}, study_form={}, course={:?}, username={:?}",
+            telegram_id, faculty, group, study_form, course, username
         );
-        match students_repo::insert(&self.pool, telegram_id, faculty, group, study_form).await {
+        match students_repo::insert(
+            &self.pool,
+            telegram_id,
+            faculty,
+            group,
+            study_form,
+            course,
+            username,
+        )
+        .await
+        {
             Ok(student) => {
                 info!(
                     "Студент с telegram_id={} успешно зарегистрирован (id={}).",
@@ -108,4 +120,3 @@ impl DbFacade {
         user_states_repo::update_course(&self.pool, telegram_id, course).await
     }
 }
-

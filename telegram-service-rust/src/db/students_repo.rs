@@ -40,16 +40,18 @@ pub async fn insert(
     faculty: &str,
     group_name: &str,
     study_form: &str,
+    course: Option<&str>,
+    username: Option<&str>,
 ) -> anyhow::Result<Student> {
     info!(
-        "Регистрация нового студента: telegram_id={}, faculty={}, group={}, study_form={}",
-        telegram_id, faculty, group_name, study_form
+        "Регистрация нового студента: telegram_id={}, faculty={}, group={}, study_form={}, course={:?}, username={:?}",
+        telegram_id, faculty, group_name, study_form, course, username
     );
 
     let res = sqlx::query_as::<_, Student>(
         r#"
-        INSERT INTO students (telegram_id, faculty, group_name, study_form)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO students (telegram_id, faculty, group_name, study_form, course, username)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, telegram_id, faculty, group_name, study_form, created_at
         "#
     )
@@ -57,6 +59,8 @@ pub async fn insert(
     .bind(faculty)
     .bind(group_name)
     .bind(study_form)
+    .bind(course)
+    .bind(username)
     .fetch_one(pool)
     .await;
 
