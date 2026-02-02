@@ -2,6 +2,7 @@
 //! Диспетчер для удобной обработки команд меню с контекстом
 
 use teloxide::prelude::*;
+use teloxide::types::InlineKeyboardMarkup;
 use crate::domain::menu::MenuCommand;
 use crate::services::telegram::menu;
 use log::info;
@@ -61,21 +62,17 @@ impl MenuDispatcher {
     async fn show_main_menu(
         context: &MenuCommandContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        context
-            .bot
-            .edit_message_text(
-                context.query.from.id,
-                context.query.message.as_ref().unwrap().id(),
-                "🏠 **Главное меню**\n\nВыберите действие:",
-            )
-            .reply_markup(menu::menu_two_column_keyboard(&[
+        Self::edit_or_send(
+            context,
+            "🏠 **Главное меню**\n\nВыберите действие:",
+            menu::menu_two_column_keyboard(&[
                 MenuCommand::MyProfile,
                 MenuCommand::MySchedule,
                 MenuCommand::ChooseGroup,
                 MenuCommand::Help,
-            ]))
-            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-            .await?;
+            ]),
+        )
+        .await?;
 
         Ok(())
     }
@@ -100,16 +97,12 @@ impl MenuDispatcher {
     async fn show_profile(
         context: &MenuCommandContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        context
-            .bot
-            .edit_message_text(
-                context.query.from.id,
-                context.query.message.as_ref().unwrap().id(),
-                "👤 *Мой профиль*\n\n_\\(здесь будут данные профиля\\)_",
-            )
-            .reply_markup(menu::menu_inline_keyboard(&[MenuCommand::Back]))
-            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-            .await?;
+        Self::edit_or_send(
+            context,
+            "👤 *Мой профиль*\n\n_\\(здесь будут данные профиля\\)_",
+            menu::menu_inline_keyboard(&[MenuCommand::Back]),
+        )
+        .await?;
 
         Ok(())
     }
@@ -118,16 +111,12 @@ impl MenuDispatcher {
     async fn show_schedule(
         context: &MenuCommandContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        context
-            .bot
-            .edit_message_text(
-                context.query.from.id,
-                context.query.message.as_ref().unwrap().id(),
-                "📅 *Моё расписание*\n\n_\\(здесь будет расписание\\)_",
-            )
-            .reply_markup(menu::menu_inline_keyboard(&[MenuCommand::Back]))
-            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-            .await?;
+        Self::edit_or_send(
+            context,
+            "📅 *Моё расписание*\n\n_\\(здесь будет расписание\\)_",
+            menu::menu_inline_keyboard(&[MenuCommand::Back]),
+        )
+        .await?;
 
         Ok(())
     }
@@ -136,16 +125,12 @@ impl MenuDispatcher {
     async fn show_group_selection(
         context: &MenuCommandContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        context
-            .bot
-            .edit_message_text(
-                context.query.from.id,
-                context.query.message.as_ref().unwrap().id(),
-                "👥 *Выберите группу*\n\nДля просмотра расписания выберите нужную группу:",
-            )
-            .reply_markup(menu::menu_inline_keyboard(&[MenuCommand::Back]))
-            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-            .await?;
+        Self::edit_or_send(
+            context,
+            "👥 *Выберите группу*\n\nДля просмотра расписания выберите нужную группу:",
+            menu::menu_inline_keyboard(&[MenuCommand::Back]),
+        )
+        .await?;
 
         Ok(())
     }
@@ -170,5 +155,27 @@ impl MenuDispatcher {
 
         Ok(())
     }
-}
 
+    async fn edit_or_send(
+        context: &MenuCommandContext,
+        text: &str,
+        markup: InlineKeyboardMarkup,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(message) = context.query.message.as_ref() {
+            context
+                .bot
+                .edit_message_text(context.query.from.id, message.id(), text)
+                .reply_markup(markup)
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .await?;
+        } else {
+            context
+                .bot
+                .send_message(context.query.from.id, text)
+                .reply_markup(markup)
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .await?;
+        }
+        Ok(())
+    }
+}

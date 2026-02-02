@@ -12,10 +12,11 @@ use log::{info, error};
 pub async fn handle_tech_button(
     bot: Bot,
     q: CallbackQuery,
+    db: Arc<DbFacade>,
     btn: TechButton,
 ) -> Result<(), teloxide::RequestError> {
     match btn {
-        TechButton::Register => handle_register(bot, q).await?,
+        TechButton::Register => handle_register(bot, q, db).await?,
         TechButton::MySchedule => handle_schedule(bot, q).await?,
         TechButton::ChooseGroup => handle_choose_group(bot, q).await?,
     }
@@ -23,7 +24,22 @@ pub async fn handle_tech_button(
 }
 
 /// Начало регистрации - предлагаем выбрать факультет
-pub async fn handle_register(bot: Bot, q: CallbackQuery) -> Result<(), teloxide::RequestError> {
+pub async fn handle_register(
+    bot: Bot,
+    q: CallbackQuery,
+    db: Arc<DbFacade>,
+) -> Result<(), teloxide::RequestError> {
+    let telegram_id = q.from.id.0 as i64;
+    if let Err(err) = db.reset_user_state(telegram_id).await {
+        error!("Ошибка при сбросе состояния пользователя {}: {:?}", telegram_id, err);
+        bot.send_message(
+            q.from.id,
+            "❌ Ошибка при начале регистрации. Пожалуйста, попробуй ещё раз.",
+        )
+        .await?;
+        return Ok(());
+    }
+
     bot.send_message(q.from.id, "✨ Начинаем регистрацию!\nВыбери факультет 📚")
         .reply_markup(faculty_keyboard())
         .await?;
@@ -50,9 +66,21 @@ pub async fn handle_choose_group(bot: Bot, q: CallbackQuery) -> Result<(), telox
 pub async fn handle_faculty_choice(
     bot: Bot,
     q: CallbackQuery,
+    db: Arc<DbFacade>,
     faculty: Faculty,
 ) -> Result<(), teloxide::RequestError> {
     info!("Пользователь {} выбрал факультет: {:?}", q.from.id, faculty);
+
+    let telegram_id = q.from.id.0 as i64;
+    if let Err(err) = db.set_user_faculty(telegram_id, faculty.title()).await {
+        error!("Ошибка при сохранении факультета {}: {:?}", telegram_id, err);
+        bot.send_message(
+            q.from.id,
+            "❌ Не удалось сохранить факультет. Пожалуйста, попробуй ещё раз.",
+        )
+        .await?;
+        return Ok(());
+    }
     
     bot.send_message(
         q.from.id,
@@ -68,9 +96,21 @@ pub async fn handle_faculty_choice(
 pub async fn handle_study_form(
     bot: Bot,
     q: CallbackQuery,
+    db: Arc<DbFacade>,
     form: StudyForm,
 ) -> Result<(), teloxide::RequestError> {
     info!("Пользователь {} выбрал форму обучения: {:?}", q.from.id, form);
+
+    let telegram_id = q.from.id.0 as i64;
+    if let Err(err) = db.set_user_study_form(telegram_id, form.title()).await {
+        error!("Ошибка при сохранении формы обучения {}: {:?}", telegram_id, err);
+        bot.send_message(
+            q.from.id,
+            "❌ Не удалось сохранить форму обучения. Пожалуйста, попробуй ещё раз.",
+        )
+        .await?;
+        return Ok(());
+    }
     
     bot.send_message(
         q.from.id,
@@ -86,9 +126,21 @@ pub async fn handle_study_form(
 pub async fn handle_course(
     bot: Bot,
     q: CallbackQuery,
+    db: Arc<DbFacade>,
     course: Course,
 ) -> Result<(), teloxide::RequestError> {
     info!("Пользователь {} выбрал курс: {:?}", q.from.id, course);
+
+    let telegram_id = q.from.id.0 as i64;
+    if let Err(err) = db.set_user_course(telegram_id, course.title()).await {
+        error!("Ошибка при сохранении курса {}: {:?}", telegram_id, err);
+        bot.send_message(
+            q.from.id,
+            "❌ Не удалось сохранить курс. Пожалуйста, попробуй ещё раз.",
+        )
+        .await?;
+        return Ok(());
+    }
     
     bot.send_message(
         q.from.id,
@@ -111,9 +163,39 @@ pub async fn handle_group(
     
     info!("Пользователь {} выбрал группу: {:?}", q.from.id, group);
     
-    // Для простоты предполагаем, что выбирающий МИТ факультет, очная форма
-    // В реальной системе нужно брать эти данные из состояния пользователя
-    match db.register_student(telegram_id, "МИТ", group.title(), "Очная").await {
+    let state = match db.get_user_state(telegram_id).await {
+        Ok(Some(state)) if state.is_complete() => state,
+        Ok(Some(_)) => {
+            bot.send_message(
+                q.from.id,
+                "❌ Не хватает данных регистрации. Пожалуйста, начни регистрацию заново.",
+            )
+            .await?;
+            return Ok(());
+        }
+        Ok(None) => {
+            bot.send_message(
+                q.from.id,
+                "❌ Состояние регистрации не найдено. Пожалуйста, начни регистрацию заново.",
+            )
+            .await?;
+            return Ok(());
+        }
+        Err(err) => {
+            error!("Ошибка при получении состояния пользователя {}: {:?}", telegram_id, err);
+            bot.send_message(
+                q.from.id,
+                "❌ Ошибка при регистрации. Пожалуйста, попробуй ещё раз.",
+            )
+            .await?;
+            return Ok(());
+        }
+    };
+
+    let faculty = state.faculty().unwrap_or("МИТ");
+    let study_form = state.study_form().unwrap_or("Очная");
+
+    match db.register_student(telegram_id, faculty, group.title(), study_form).await {
         Ok(student) => {
             info!("Студент {} успешно зарегистрирован", telegram_id);
             bot.send_message(

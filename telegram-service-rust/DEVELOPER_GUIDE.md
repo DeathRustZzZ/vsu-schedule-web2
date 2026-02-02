@@ -24,11 +24,11 @@ RUST_LOG=info
 
 3. **Инициализируйте БД:**
 ```bash
-# Установите Diesel CLI если ещё не установлен
-cargo install diesel_cli --no-default-features --features postgres
+# Установите SQLx CLI если ещё не установлен
+cargo install sqlx-cli --no-default-features --features postgres
 
 # Запустите миграции
-diesel migration run
+sqlx migrate run
 ```
 
 4. **Запустите бота:**
@@ -372,13 +372,12 @@ cargo clippy
 cargo test -- --nocapture
 
 # Создание новой миграции
-diesel migration generate name_of_migration
+sqlx migrate add name_of_migration
 
-# Откат последней миграции
-diesel migration revert
+# Откат последней миграции (если есть down-миграции)
+sqlx migrate revert
 ```
 
 ---
 
 Для дополнительной информации смотрите `ARCHITECTURE.md`
-

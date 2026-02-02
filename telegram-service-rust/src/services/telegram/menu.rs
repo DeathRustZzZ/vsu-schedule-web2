@@ -5,14 +5,15 @@ use teloxide::types::{
     InlineKeyboardButton, InlineKeyboardMarkup,
 };
 use crate::domain::menu::MenuCommand;
+use crate::domain::buttons::TechButton;
 
 /// Создаёт Inline клавиатуру главного меню для незарегистрированного пользователя
 pub fn main_menu_inline_keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(vec![
         vec![
             InlineKeyboardButton::callback(
-                MenuCommand::Register.text(),
-                MenuCommand::Register.callback(),
+                TechButton::Register.title(),
+                TechButton::Register.callback(),
             ),
         ],
         vec![
@@ -126,5 +127,4 @@ pub fn simple_inline_keyboard(items: &[(String, String)]) -> InlineKeyboardMarku
 
     InlineKeyboardMarkup::new(rows)
 }
-
 

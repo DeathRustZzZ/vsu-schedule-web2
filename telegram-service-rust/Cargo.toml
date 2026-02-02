@@ -24,5 +24,4 @@ log = "0.4.29"
 pretty_env_logger = "0.5.0"
 
 sqlx = {version = "0.9.0-alpha.1", features = ["postgres", "runtime-tokio", "macros", "tls-native-tls", "uuid", "chrono"]}
-diesel = {version = "2.3.5", features = ["postgres", "r2d2", "uuid", "chrono"]}
 anyhow = "1.0.100"

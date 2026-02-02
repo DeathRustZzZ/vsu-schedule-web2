@@ -448,45 +448,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diesel"
-version = "2.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e130c806dccc85428c564f2dc5a96e05b6615a27c9a28776bd7761a9af4bb552"
-dependencies = [
- "bitflags",
- "byteorder",
- "chrono",
- "diesel_derives",
- "downcast-rs",
- "itoa",
- "pq-sys",
- "r2d2",
- "uuid",
-]
-
-[[package]]
-name = "diesel_derives"
-version = "2.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c30b2969f923fa1f73744b92bb7df60b858df8832742d9a3aceb79236c0be1d2"
-dependencies = [
- "diesel_table_macro_syntax",
- "dsl_auto_type",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "diesel_table_macro_syntax"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe2444076b48641147115697648dc743c2c00b61adade0f01ce67133c7babe8c"
-dependencies = [
- "syn",
-]
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -516,12 +477,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
-name = "downcast-rs"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "117240f60069e65410b3ae1bb213295bd828f707b5bec6596a1afc8793ce0cbc"
-
-[[package]]
 name = "dptree"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -529,20 +484,6 @@ checksum = "db96968fcf52fe063a98c75df1d1f2b1fba304e7ae29b72fdc81c1165b7e2fd0"
 dependencies = [
  "colored",
  "futures",
-]
-
-[[package]]
-name = "dsl_auto_type"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd122633e4bef06db27737f21d3738fb89c8f6d5360d6d9d7635dda142a7757e"
-dependencies = [
- "darling",
- "either",
- "heck",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -1679,17 +1620,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pq-sys"
-version = "0.7.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "574ddd6a267294433f140b02a726b0640c43cf7c6f717084684aaa3b285aba61"
-dependencies = [
- "libc",
- "pkg-config",
- "vcpkg",
-]
-
-[[package]]
 name = "pretty_env_logger"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1808,17 +1738,6 @@ name = "r-efi"
 version = "5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
-
-[[package]]
-name = "r2d2"
-version = "0.8.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51de85fb3fb6524929c8a2eb85e6b6d363de4e8c48f9e2c2eac4944abc181c93"
-dependencies = [
- "log",
- "parking_lot",
- "scheduled-thread-pool",
-]
 
 [[package]]
 name = "rand"
@@ -2137,15 +2056,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "891d81b926048e76efe18581bf793546b4c0eaf8448d72be8de2bbee5fd166e1"
 dependencies = [
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "scheduled-thread-pool"
-version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cbc66816425a074528352f5789333ecff06ca41b36b0b0efdfbb29edc391a19"
-dependencies = [
- "parking_lot",
 ]
 
 [[package]]
@@ -2944,7 +2854,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
- "diesel",
  "dotenvy",
  "log",
  "pretty_env_logger",

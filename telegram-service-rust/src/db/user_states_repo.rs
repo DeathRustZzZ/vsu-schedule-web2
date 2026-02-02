@@ -40,22 +40,34 @@ pub async fn insert(pool: &PgPool, telegram_id: i64) -> anyhow::Result<UserState
 pub async fn reset(pool: &PgPool, telegram_id: i64) -> anyhow::Result<UserState> {
     debug!("Сброс состояния пользователя telegram_id={}", telegram_id);
 
-    let state = sqlx::query_as::<_, UserState>(
+    let updated = sqlx::query_as::<_, UserState>(
+        "UPDATE user_states
+         SET state = 'idle',
+             faculty = NULL,
+             study_form = NULL,
+             course = NULL,
+             updated_at = NOW()
+         WHERE telegram_id = $1
+         RETURNING id, telegram_id, state, faculty, study_form, course, created_at, updated_at"
+    )
+    .bind(telegram_id)
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(state) = updated {
+        return Ok(state);
+    }
+
+    let inserted = sqlx::query_as::<_, UserState>(
         "INSERT INTO user_states (telegram_id, state)
          VALUES ($1, 'idle')
-         ON CONFLICT (telegram_id) DO UPDATE
-           SET state = 'idle',
-               faculty = NULL,
-               study_form = NULL,
-               course = NULL,
-               updated_at = NOW()
          RETURNING id, telegram_id, state, faculty, study_form, course, created_at, updated_at"
     )
     .bind(telegram_id)
     .fetch_one(pool)
     .await?;
 
-    Ok(state)
+    Ok(inserted)
 }
 
 /// Обновить состояние пользователя

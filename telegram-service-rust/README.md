@@ -35,11 +35,11 @@ RUST_LOG=info
 
 3. **Инициализируйте БД:**
 ```bash
-# Установите Diesel CLI
-cargo install diesel_cli --no-default-features --features postgres
+# Установите SQLx CLI
+cargo install sqlx-cli --no-default-features --features postgres
 
 # Запустите миграции
-diesel migration run
+sqlx migrate run
 ```
 
 4. **Запустите бота:**
@@ -188,7 +188,7 @@ pub async fn risky_operation() -> anyhow::Result<Data> {
 - **teloxide** - Telegram Bot API
 - **tokio** - Async runtime
 - **sqlx** - Работа с БД
-- **diesel** - Миграции
+- **sqlx-cli** - Миграции
 - **log** - Логирование
 - **anyhow** - Обработка ошибок
 
@@ -237,4 +237,3 @@ Contributions приветствуются! Пожалуйста:
 **Дата**: Январь 2026
 
 Для более подробной информации смотрите [документацию](./ARCHITECTURE.md).
-

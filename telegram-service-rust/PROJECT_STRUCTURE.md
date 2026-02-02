@@ -8,7 +8,6 @@ tg_bot_vsu/
 │   ├── main.rs                          ✅ Точка входа
 │   ├── config.rs                        ✅ Конфигурация приложения
 │   ├── errors.rs                        ✅ Типы ошибок
-│   ├── schema.rs                        ✅ Схема БД (автогенерировано Diesel)
 │   │
 │   ├── app/                             📦 Application Layer
 │   │   ├── mod.rs                       ✅ Экспорты
@@ -50,22 +49,16 @@ tg_bot_vsu/
 │               ├── keyboards.rs         ✅ Клавиатуры регистрации
 │               └── facade.rs            ✅ RegistrationFacade
 │
-├── migrations/                          📦 Миграции Diesel
-│   ├── 00000000000000_diesel_initial_setup/
-│   ├── 2026-01-12-114732-0000_create_schedule_lessons/
-│   ├── 2026-01-14-123212-0000_create_students/
-│   ├── 2026-01-14-165306-0000_add_study_form_to_students/
-│   ├── 2026-01-14-175957-0000_add_course_and_username_to_students/
-│   │
-│   └── 2026-01-16-125016-0000_add_user_states/  ✅ НОВАЯ МИГРАЦИЯ
-│       ├── up.sql                       ✅ Создание таблицы user_states
-│       └── down.sql                     ✅ Откат миграции
+├── migrations/                          📦 Миграции SQLx
+│   ├── 20260202_000001_create_students.sql
+│   ├── 20260202_000002_create_user_states.sql
+│   └── 20260202_000003_create_schedule_lessons.sql
 │
 ├── target/                              📦 Выходные артефакты (сборка)
 │
 ├── Cargo.toml                           ✅ Конфигурация проекта
 ├── Cargo.lock                           ✅ Lockfile зависимостей
-├── diesel.toml                          ✅ Конфигурация Diesel
+├── .env                                 ✅ Переменные окружения (локально)
 │
 ├── README.md                            ✅ Главная документация (ПЕРЕДЕЛАНО)
 ├── ARCHITECTURE.md                      ✅ Архитектура проекта (НОВОЕ)
@@ -83,7 +76,7 @@ tg_bot_vsu/
 
 | Директория | Файлы | Описание |
 |-----------|-------|---------|
-| **root** | 4 | main.rs, config.rs, errors.rs, schema.rs |
+| **root** | 3 | main.rs, config.rs, errors.rs |
 | **app/** | 2 | Слой приложения |
 | **db/** | 5 | Репозитории и фасад БД |
 | **domain/** | 9 | Бизнес-объекты (с groups/) |
@@ -106,12 +99,9 @@ tg_bot_vsu/
 
 | Миграция | Статус |
 |----------|--------|
-| 00000000000000_diesel_initial_setup | ✅ |
-| 2026-01-12-114732-0000_create_schedule_lessons | ✅ |
-| 2026-01-14-123212-0000_create_students | ✅ |
-| 2026-01-14-165306-0000_add_study_form_to_students | ✅ |
-| 2026-01-14-175957-0000_add_course_and_username_to_students | ✅ |
-| 2026-01-16-125016-0000_add_user_states | ✅ НОВАЯ |
+| 20260202_000001_create_students | ✅ |
+| 20260202_000002_create_user_states | ✅ |
+| 20260202_000003_create_schedule_lessons | ✅ |
 
 ---
 
@@ -123,7 +113,6 @@ tg_bot_vsu/
 src/main.rs                                    : 19 строк
 src/config.rs                                  : 42 строк
 src/errors.rs                                  : 48 строк
-src/schema.rs                                  : 39 строк
 
 src/app/facade.rs                              : 41 строк
 src/app/mod.rs                                 : 1 строка
@@ -331,7 +320,7 @@ Send confirmation to user
 - **tokio** - Async runtime
 - **teloxide** - Telegram Bot API
 - **sqlx** - Работа с БД (async)
-- **diesel** - Миграции БД
+- **sqlx-cli** - Миграции БД
 - **log + pretty_env_logger** - Логирование
 - **anyhow** - Обработка ошибок
 - **chrono** - Работа с датой/временем
@@ -343,9 +332,9 @@ Send confirmation to user
 
 ### Все файлы на месте?
 - ✅ `src/` - 27 файлов кода
-- ✅ `migrations/` - 6 миграций
+- ✅ `migrations/` - 3 миграции
 - ✅ Документация - 6 файлов
-- ✅ Конфиг файлы (Cargo.toml, diesel.toml)
+- ✅ Конфиг файлы (Cargo.toml)
 
 ### Все компилируется?
 - ✅ `cargo build` - успешно
@@ -381,4 +370,3 @@ Send confirmation to user
 **Статус:** ✅ ПОЛНАЯ ГОТОВНОСТЬ
 
 Структура проекта оптимальна и готова к расширению! 🚀
-

@@ -20,6 +20,17 @@ services:
     depends_on:
       - db
 
+  telegram-service-rust:
+    image: telegram-service-rust:latest
+    networks:
+      - vsu-schedule-network
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - DATABASE_URL=postgresql://admin:admin@students-db:5432/students-db
+      - RUST_LOG=info
+    depends_on:
+      - students-db
+
   db:
     container_name: db
     image: postgres
@@ -33,3 +44,16 @@ services:
     networks:
       - vsu-schedule-network
 
+  students-db:
+    container_name: students-db
+    image: postgres
+    ports:
+      - '5434:5432'
+    volumes:
+      - ./init-scripts-students:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_DB: students-db
+      POSTGRES_PASSWORD: admin
+      POSTGRES_USER: admin
+    networks:
+      - vsu-schedule-network

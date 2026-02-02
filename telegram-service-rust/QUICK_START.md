@@ -17,12 +17,8 @@ cargo build
 ## ✅ Шаг 2: Обновление БД (2 минуты)
 
 ```bash
-# Если у вас уже есть миграции
-diesel migration run
-
-# Или с нуля
-diesel setup
-diesel migration run
+# Запустить миграции
+sqlx migrate run
 ```
 
 **Что произойдёт:**
@@ -170,10 +166,10 @@ cargo fmt
 cargo clippy
 
 # Создать новую миграцию
-diesel migration generate migration_name
+sqlx migrate add migration_name
 
-# Откатить последнюю миграцию
-diesel migration revert
+# Откатить последнюю миграцию (если есть down-миграции)
+sqlx migrate revert
 ```
 
 ---
@@ -184,7 +180,7 @@ diesel migration revert
 → Посмотрите [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md#полезные-команды)
 
 ### Ошибка БД
-→ Убедитесь что миграции прошли: `diesel migration run`
+→ Убедитесь что миграции прошли: `sqlx migrate run`
 
 ### Бот не запускается
 → Проверьте `.env` файл с токеном и URL БД
@@ -271,4 +267,3 @@ diesel migration revert
 **Статус:** ✅ READY TO GO!
 
 Удачи! 🚀
-
