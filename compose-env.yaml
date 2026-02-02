@@ -7,6 +7,28 @@ networks:
 
 
 services:
+  eurekaserver:
+    image: eurekaserver:latest
+    build:
+      context: ./eurekaserver
+    ports:
+      - '8761:8761'
+    networks:
+      - vsu-schedule-network
+
+  api-gateway:
+    image: api-gateway:latest
+    build:
+      context: ./api-gateway
+    ports:
+      - '8765:8765'
+    networks:
+      - vsu-schedule-network
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eurekaserver:8761/eureka/
+    depends_on:
+      - eurekaserver
+
   schedule-service:
     image: schedule-service:latest
     build:
@@ -19,7 +41,10 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/schedule-db
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=admin
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eurekaserver:8761/eureka/
     depends_on:
+      eurekaserver:
+        condition: service_started
       db:
         condition: service_healthy
 
