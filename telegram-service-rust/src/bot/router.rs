@@ -189,7 +189,7 @@ async fn handle_action(
             show_schedule(bot, db, telegram_id, chat_id, message_id).await?;
         }
         Action::ChooseGroup => {
-            start_group_selection(bot, db, telegram_id, chat_id, message_id).await?;
+            start_registration(bot, db, telegram_id, chat_id, message_id).await?;
         }
         Action::Help => {
             show_help(bot, db, telegram_id, chat_id, message_id).await?;
@@ -265,30 +265,7 @@ async fn start_registration(
     .await
 }
 
-async fn start_group_selection(
-    bot: &Bot,
-    db: &DbFacade,
-    telegram_id: i64,
-    chat_id: ChatId,
-    message_id: Option<MessageId>,
-) -> Result<(), teloxide::RequestError> {
-    let is_registered = db.find_student(telegram_id).await.ok().flatten().is_some();
-    if !is_registered {
-        return start_registration(bot, db, telegram_id, chat_id, message_id).await;
-    }
-
-    db.set_state(telegram_id, RegistrationState::AwaitingGroup).await.ok();
-    render_screen(
-        bot,
-        db,
-        telegram_id,
-        chat_id,
-        message_id,
-        "🔎 Выбери группу:",
-        Some(keyboards::mit_group_keyboard()),
-    )
-    .await
-}
+// group selection is part of the registration flow now
 
 async fn complete_registration(
     bot: &Bot,

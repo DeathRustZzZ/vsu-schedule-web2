@@ -38,7 +38,7 @@ impl Action {
             Action::Register => "📝 Зарегистрироваться",
             Action::MyProfile => "👤 Мой профиль",
             Action::MySchedule => "📅 Моё расписание",
-            Action::ChooseGroup => "👥 Выбрать группу",
+            Action::ChooseGroup => "🏫 Сменить факультет",
             Action::Help => "❓ Справка",
             Action::Back => "◀️ Назад",
         }
