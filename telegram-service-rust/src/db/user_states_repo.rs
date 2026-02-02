@@ -92,8 +92,10 @@ pub async fn update_faculty(pool: &PgPool, telegram_id: i64, faculty: &str) -> a
     debug!("Обновление факультета пользователя telegram_id={} на {}", telegram_id, faculty);
     
     let updated = sqlx::query_as::<_, UserState>(
-        "UPDATE user_states SET faculty = $1, updated_at = NOW()
-         WHERE telegram_id = $2
+        "INSERT INTO user_states (telegram_id, state, faculty)
+         VALUES ($2, 'idle', $1)
+         ON CONFLICT (telegram_id)
+         DO UPDATE SET faculty = EXCLUDED.faculty, updated_at = NOW()
          RETURNING id, telegram_id, state, faculty, study_form, course, created_at, updated_at"
     )
     .bind(faculty)
@@ -109,8 +111,10 @@ pub async fn update_study_form(pool: &PgPool, telegram_id: i64, study_form: &str
     debug!("Обновление формы обучения пользователя telegram_id={} на {}", telegram_id, study_form);
     
     let updated = sqlx::query_as::<_, UserState>(
-        "UPDATE user_states SET study_form = $1, updated_at = NOW()
-         WHERE telegram_id = $2
+        "INSERT INTO user_states (telegram_id, state, study_form)
+         VALUES ($2, 'idle', $1)
+         ON CONFLICT (telegram_id)
+         DO UPDATE SET study_form = EXCLUDED.study_form, updated_at = NOW()
          RETURNING id, telegram_id, state, faculty, study_form, course, created_at, updated_at"
     )
     .bind(study_form)
@@ -126,8 +130,10 @@ pub async fn update_course(pool: &PgPool, telegram_id: i64, course: &str) -> any
     debug!("Обновление курса пользователя telegram_id={} на {}", telegram_id, course);
     
     let updated = sqlx::query_as::<_, UserState>(
-        "UPDATE user_states SET course = $1, updated_at = NOW()
-         WHERE telegram_id = $2
+        "INSERT INTO user_states (telegram_id, state, course)
+         VALUES ($2, 'idle', $1)
+         ON CONFLICT (telegram_id)
+         DO UPDATE SET course = EXCLUDED.course, updated_at = NOW()
          RETURNING id, telegram_id, state, faculty, study_form, course, created_at, updated_at"
     )
     .bind(course)

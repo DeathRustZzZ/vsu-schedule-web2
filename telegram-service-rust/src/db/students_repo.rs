@@ -52,6 +52,13 @@ pub async fn insert(
         r#"
         INSERT INTO students (telegram_id, faculty, group_name, study_form, course, username)
         VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (telegram_id)
+        DO UPDATE SET
+            faculty = EXCLUDED.faculty,
+            group_name = EXCLUDED.group_name,
+            study_form = EXCLUDED.study_form,
+            course = EXCLUDED.course,
+            username = EXCLUDED.username
         RETURNING id, telegram_id, faculty, group_name, study_form, created_at
         "#
     )

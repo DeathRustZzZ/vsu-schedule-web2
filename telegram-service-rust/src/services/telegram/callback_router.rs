@@ -29,10 +29,12 @@ pub async fn route_callback(
                 let context = MenuCommandContext {
                     bot: bot.clone(),
                     query: q,
+                    db: Arc::clone(&db),
                 };
                 if let Err(e) = MenuDispatcher::dispatch(&context, menu_cmd).await {
                     warn!("Ошибка при обработке меню команды '{}': {:?}", data, e);
                 }
+                let _ = bot.answer_callback_query(callback_query_id).await;
                 return Ok(());
             }
             Err(_) => {

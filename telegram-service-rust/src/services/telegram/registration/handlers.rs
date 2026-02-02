@@ -164,23 +164,7 @@ pub async fn handle_group(
     info!("Пользователь {} выбрал группу: {:?}", q.from.id, group);
     
     let state = match db.get_user_state(telegram_id).await {
-        Ok(Some(state)) if state.is_complete() => state,
-        Ok(Some(_)) => {
-            bot.send_message(
-                q.from.id,
-                "❌ Не хватает данных регистрации. Пожалуйста, начни регистрацию заново.",
-            )
-            .await?;
-            return Ok(());
-        }
-        Ok(None) => {
-            bot.send_message(
-                q.from.id,
-                "❌ Состояние регистрации не найдено. Пожалуйста, начни регистрацию заново.",
-            )
-            .await?;
-            return Ok(());
-        }
+        Ok(state) => state,
         Err(err) => {
             error!("Ошибка при получении состояния пользователя {}: {:?}", telegram_id, err);
             bot.send_message(
@@ -192,9 +176,9 @@ pub async fn handle_group(
         }
     };
 
-    let faculty = state.faculty().unwrap_or("МИТ");
-    let study_form = state.study_form().unwrap_or("Очная");
-    let course = state.course();
+    let faculty = state.as_ref().and_then(|s| s.faculty()).unwrap_or("МИТ");
+    let study_form = state.as_ref().and_then(|s| s.study_form()).unwrap_or("Очная");
+    let course = state.as_ref().and_then(|s| s.course());
     let username = q.from.username.as_deref();
 
     match db
