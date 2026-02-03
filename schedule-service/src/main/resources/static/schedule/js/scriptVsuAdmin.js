@@ -8,9 +8,8 @@ const dropZone = document.getElementById("upload-container");
 const facultySelect = document.getElementById("facult");
 
 logoutBtn.onclick = function () {
-    fetch("/schedule/auth/logout", { method: "GET", credentials: "include" })
+    fetch("/schedule/auth/logout", { method: "POST", credentials: "include" })
         .then(() => {
-            localStorage.removeItem("token");
             window.location.href = "/schedule/login";
         })
         .catch(error => console.log("error", error));
