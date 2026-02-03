@@ -1,38 +1,24 @@
-const body = document.querySelector("body"),
-      modeToggle = body.querySelector(".mode-toggle");
-      sidebar = body.querySelector("nav");
-      sidebarToggle = body.querySelector(".sidebar-toggle");
-      logoutBtn = document.getElementById("logoutBtn");
-      submitBtn = document.getElementById("submit_button")
+const body = document.querySelector("body");
+const modeToggle = body.querySelector(".mode-toggle");
+const sidebar = body.querySelector("nav");
+const logoutBtn = document.getElementById("logoutBtn");
+const submitBtn = document.getElementById("submit_button");
+const fileInput = document.getElementById("file-input");
+const dropZone = document.getElementById("upload-container");
+const facultySelect = document.getElementById("facult");
 
 logoutBtn.onclick = function () {
-    var myHeaders = new Headers();
-    myHeaders.append("Content-Type", "application/json");
-    myHeaders.append("Cookie", "JSESSIONID=C9A5B398E23E08EBC2392F912302C741");
-
-let files = "";
-
-    var requestOptions = {
-      method: 'GET',
-      headers: myHeaders,
-      redirect: 'follow'
-    };
-
-    fetch("http://127.0.0.1:8765/schedule/auth/logout", requestOptions)
-      .then(response => response.text())
-      .then(result => {
+    fetch("/schedule/auth/logout", { method: "GET", credentials: "include" })
+        .then(() => {
             localStorage.removeItem("token");
             window.location.href = "/schedule/login";
-
-
-            })
-
-      .catch(error => console.log('error', error));
+        })
+        .catch(error => console.log("error", error));
 }
 
 submitBtn.onclick = function () {
 
-    sendFiles()
+    sendFiles();
 }
 
 
@@ -55,79 +41,71 @@ modeToggle.addEventListener("click", () =>{
     }
 });
 
-   $('#file-input').focus(function() {
-       $('label').addClass('focus');
-   })
-   .focusout(function() {
-       $('label').removeClass('focus');
-   });
-   var dropZone = $('#upload-container');
-   dropZone.on('drag dragstart dragend dragover dragenter dragleave drop', function(){
-       return false;
-   });
-   dropZone.on('dragover dragenter', function() {
-       dropZone.addClass('dragover');
-   });
+fileInput.addEventListener("focus", () => {
+    document.querySelector("label").classList.add("focus");
+});
+fileInput.addEventListener("blur", () => {
+    document.querySelector("label").classList.remove("focus");
+});
 
-   dropZone.on('dragleave', function(e) {
-       dropZone.removeClass('dragover');
-   });
-   dropZone.on('dragleave', function(e) {
-       let dx = e.pageX - dropZone.offset().left;
-       let dy = e.pageY - dropZone.offset().top;
-       if ((dx < 0) || (dx > dropZone.width()) || (dy < 0) || (dy > dropZone.height())) {
-            dropZone.removeClass('dragover');
-       };
-   });
-   dropZone.on('drop', function(e) {
-       dropZone.removeClass('dragover');
-       files = e.originalEvent.dataTransfer.files;
-       sendFiles(files);
-   });
-   $('#file-input').change(function() {
-       files = this.files;
-       sendFiles(files);
-   });
-function sendFiles() {
-    let facult = document.getElementById("facult").value
-    console.log(facult)
-    if(facult === "select"){
-        alert("вы не выбрали факультет!")
+["drag", "dragstart", "dragend", "dragover", "dragenter", "dragleave", "drop"].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    });
+});
+
+dropZone.addEventListener("dragover", () => {
+    dropZone.classList.add("dragover");
+});
+dropZone.addEventListener("dragenter", () => {
+    dropZone.classList.add("dragover");
+});
+dropZone.addEventListener("dragleave", () => {
+    dropZone.classList.remove("dragover");
+});
+dropZone.addEventListener("drop", (e) => {
+    dropZone.classList.remove("dragover");
+    const files = e.dataTransfer.files;
+    sendFiles(files);
+});
+
+fileInput.addEventListener("change", () => {
+    sendFiles(fileInput.files);
+});
+
+function sendFiles(files) {
+    const facult = facultySelect ? facultySelect.value : "select";
+    if (facult === "select") {
+        alert("вы не выбрали факультет!");
+        return;
     }
-    let Data = new FormData();
-    var myHeaders = new Headers();
-    myHeaders.append("Cookie", "JSESSIONID=32625BC457E59FAB133BD2B9C60A08A8");
-    if(document.getElementById("file-input") === null){
-        return // show exception on the page
+    if (!fileInput) {
+        return;
     }
-    let file =  document.getElementById("file-input").files[0]
-    if(file === undefined){
+    const file = files && files.length ? files[0] : fileInput.files[0];
+    if (!file) {
         alert("вы не выбрали файл!");
+        return;
     }
 
-    Data.append('file', file,file.name);
+    const data = new FormData();
+    data.append("file", file, file.name);
 
-    var requestOptions = {
-      method: 'POST',
-      headers: myHeaders,
-      body: Data,
-      redirect: 'follow'
-    };
-
-    fetch("http://127.0.0.1:8765/api/v1/schedule/uploadFile?f=" + facult, requestOptions)
-      .then(response => {
-            if(response.status == 200){
-                alert("Успешно!")
+    fetch(`/api/v1/schedule/uploadFile?f=${encodeURIComponent(facult)}`, {
+        method: "POST",
+        body: data,
+        credentials: "include",
+        redirect: "follow"
+    })
+        .then(response => {
+            if (response.status === 200) {
+                alert("Успешно!");
+            } else if (response.status === 400) {
+                alert("Ошибка заполнения или формата таблицы!");
+            } else {
+                alert("Ошибка загрузки.");
             }
-            if(response.status == 400){
-                alert("Ошибка заполнения или формата таблицы!")
-            }
-      })
-      .then(result => console.log(result))
-      .catch(error => console.log('error', error));
-};
-let descr = document.querySelector('.descr');
-let src = document.querySelector('.descr_src');
-let button = document.querySelector('.switch');
-let container = document.querySelector('.container ');
-
+        })
+        .catch(error => console.log("error", error));
+}

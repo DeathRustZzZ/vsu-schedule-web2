@@ -15,9 +15,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -37,38 +42,40 @@ public class ScheduleService {
 
     private final BotScheduleCacheService botScheduleCacheService;
 
+    @Transactional
     public void uploadSchedule(MultipartFile multipartFile, String faculty) {
-        lessonRepository.deleteAllWhereFacultyEquals(faculty);
+        String normalizedFaculty = normalizeFaculty(faculty);
         File file = saveFile(multipartFile);
-        parser.parse(file, faculty);
+        parser.parse(file, normalizedFaculty);
         List<Group> groups = parser.getGroups();
         List<Lesson> lessons = parser.getLessons();
         List<Teacher> teachers = parser.getTeachers();
+        lessonRepository.deleteAllWhereFacultyEquals(normalizedFaculty);
         for (Lesson lesson : lessons) {
-            lesson.setFaculty(faculty);
+            lesson.setFaculty(normalizedFaculty);
             lesson.setTeacherId(-1);
         }
         processTeachers(teachers);
-        processGroups(groups,faculty);
-        botScheduleCacheService.rebuildForFaculty(faculty, groups, lessons);
+        processGroups(groups, normalizedFaculty);
+        botScheduleCacheService.rebuildForFaculty(normalizedFaculty, groups, lessons);
 
     }
 
     private File saveFile(MultipartFile multipartFile) {
-        String path = System.getProperty("user.dir") + "\\schedule-service\\src\\main\\temp";
-        if (!multipartFile.isEmpty()) {
-            File file = new File(path + "\\" + multipartFile.getOriginalFilename());
-            if (file.exists()) file.delete();
-            file = new File(path + "\\" + multipartFile.getOriginalFilename());
-            try {
-                FileOutputStream fileOutputStream = new FileOutputStream(file);
-                fileOutputStream.write(multipartFile.getBytes());
-                fileOutputStream.close();
-                return file;
-            } catch (Exception e) {
-                throw new FileException(e.getMessage());
-            }
-        } else throw new FileIsEmptyException("file cannot be empty.");
+        if (multipartFile.isEmpty()) {
+            throw new FileIsEmptyException("file cannot be empty.");
+        }
+        Path baseDir = Paths.get(System.getProperty("user.dir"), "schedule-service", "src", "main", "temp");
+        try {
+            Files.createDirectories(baseDir);
+            String originalName = multipartFile.getOriginalFilename();
+            String safeName = originalName == null || originalName.isBlank() ? "schedule.xlsx" : originalName;
+            Path target = baseDir.resolve(safeName);
+            multipartFile.transferTo(target);
+            return target.toFile();
+        } catch (IOException e) {
+            throw new FileException(e.getMessage());
+        }
     }
 
     private void processTeachers(List<Teacher> teachers) {
@@ -93,7 +100,6 @@ public class ScheduleService {
 
     private void processGroups(List<Group> groups, String faculty) {
         for (Group group : groups) {
-            group.setId(group.getId().replace('/', '.'));
             group.setFaculty(faculty);
             for (int j = 0; j < group.getCommonLessons().size(); j++) {
                 Lesson lesson = group.getCommonLessons().get(j);
@@ -111,5 +117,31 @@ public class ScheduleService {
             }
         }
         groupRepository.saveAll(groups);
+    }
+
+    private String normalizeFaculty(String faculty) {
+        if (faculty == null) {
+            return "";
+        }
+        String normalized = faculty.trim().toLowerCase(Locale.ROOT);
+        if (normalized.equals("фмиит") || normalized.equals("fmiit")) {
+            return "ФМиИТ";
+        }
+        if (normalized.contains("математики") && normalized.contains("информационных")) {
+            return "ФМиИТ";
+        }
+        if (normalized.equals("педфак") || normalized.contains("педагог")) {
+            return "Педфак";
+        }
+        if (normalized.equals("юрфак") || normalized.contains("юрид")) {
+            return "ЮрФак";
+        }
+        if (normalized.contains("хим") || normalized.contains("био")) {
+            return "ХИМБИО";
+        }
+        if (normalized.contains("физк") || normalized.contains("спорт")) {
+            return "Физкультура";
+        }
+        return faculty.trim();
     }
 }

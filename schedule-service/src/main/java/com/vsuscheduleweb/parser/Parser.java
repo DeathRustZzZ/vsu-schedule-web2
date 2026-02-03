@@ -44,7 +44,8 @@ public class Parser {
     );
 
     private static final Pattern SUBGROUP_PATTERN = Pattern.compile(".+_\\d+");
-    private static final Pattern TIME_RANGE_PATTERN = Pattern.compile("(\\d{1,2}[:.]\\d{2})\\s*-\\s*(\\d{1,2}[:.]\\d{2})");
+    private static final Pattern TIME_RANGE_PATTERN =
+            Pattern.compile("\\(?\\s*(\\d{1,2}[:.]\\d{2})\\s*-\\s*(\\d{1,2}[:.]\\d{2})\\s*\\)?");
     private static final Pattern QUALIFICATION_PATTERN = Pattern.compile("\\(([^)]*)\\)\\s*$");
 
     private List<Teacher> teachers = new ArrayList<>();
@@ -78,12 +79,20 @@ public class Parser {
         lessons = new ArrayList<>();
 
         Workbook wb = readWorkbook(xlsxFile);
-        Sheet sheet = wb.getSheetAt(0);
-        SheetGrid grid = new SheetGrid(sheet);
+        try {
+            Sheet sheet = wb.getSheetAt(0);
+            SheetGrid grid = new SheetGrid(sheet);
 
-        Header header = Header.detect(grid);
-        ParseContext context = buildGroups(header, grid, faculty);
-        parseLessons(header, grid, context);
+            Header header = Header.detect(grid);
+            ParseContext context = buildGroups(header, grid, faculty);
+            parseLessons(header, grid, context);
+        } finally {
+            try {
+                wb.close();
+            } catch (Exception ignore) {
+                // close quietly
+            }
+        }
     }
 
     private ParseContext buildGroups(Header header, SheetGrid grid, String faculty) throws ParserException {
@@ -108,7 +117,7 @@ public class Parser {
             Group group = groupById.get(groupId);
             if (group == null) {
                 group = new Group();
-                group.setId(groupId + "/" + faculty);
+                group.setId(groupId);
                 group.setName(groupName);
                 groupById.put(groupId, group);
             }
@@ -402,15 +411,24 @@ public class Parser {
             int groupRow = findHeaderRowAbove(grid, subgroupRow - 1, bestColumns);
             int nameRow = findHeaderRowAbove(grid, groupRow - 1, bestColumns);
 
-            List<Integer> dayRows = new ArrayList<>();
-            for (int row = 1; row <= grid.maxRow(); row++) {
-                String value = grid.getValue(row, 4);
-                if (DAY_NAMES.contains(value)) {
-                    dayRows.add(row);
-                }
+            int dayColumn = detectDayColumn(grid);
+            List<Integer> dayRows = findDayRows(grid, dayColumn);
+            if (dayRows.isEmpty()) {
+                throw new ParserException("table format exception: day rows not found");
             }
+            int dateColumn = detectDateColumn(grid, dayRows.get(0), dayColumn);
+            int lessonNumberColumn = detectLessonNumberColumn(grid, dayRows.get(0), dateColumn);
 
-            return new Header(subgroupRow, groupRow, nameRow, bestColumns, dayRows, 4, 5, 6);
+            return new Header(
+                    subgroupRow,
+                    groupRow,
+                    nameRow,
+                    bestColumns,
+                    dayRows,
+                    dayColumn,
+                    dateColumn,
+                    lessonNumberColumn
+            );
         }
 
         private static int findHeaderRowAbove(SheetGrid grid, int startRow, List<Integer> subgroupColumns) throws ParserException {
@@ -427,6 +445,81 @@ public class Parser {
                 }
             }
             throw new ParserException("table format exception: header rows not found");
+        }
+
+        private static int detectDayColumn(SheetGrid grid) throws ParserException {
+            Map<Integer, Integer> columnHits = new HashMap<>();
+            int maxRow = Math.min(grid.maxRow(), 120);
+            int maxCol = Math.min(grid.maxCol(), 80);
+            for (int row = 1; row <= maxRow; row++) {
+                for (int col = 1; col <= maxCol; col++) {
+                    String value = grid.getValue(row, col);
+                    if (DAY_NAMES.contains(value)) {
+                        columnHits.merge(col, 1, Integer::sum);
+                    }
+                }
+            }
+            return columnHits.entrySet()
+                    .stream()
+                    .max(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey)
+                    .orElseThrow(() -> new ParserException("table format exception: day column not found"));
+        }
+
+        private static List<Integer> findDayRows(SheetGrid grid, int dayColumn) {
+            List<Integer> rows = new ArrayList<>();
+            for (int row = 1; row <= grid.maxRow(); row++) {
+                String value = grid.getValue(row, dayColumn);
+                if (DAY_NAMES.contains(value)) {
+                    rows.add(row);
+                }
+            }
+            return rows;
+        }
+
+        private static int detectDateColumn(SheetGrid grid, int dayRow, int dayColumn) throws ParserException {
+            int maxCol = Math.min(grid.maxCol(), 80);
+            for (int col = dayColumn + 1; col <= maxCol; col++) {
+                String value = grid.getValue(dayRow, col);
+                if (looksLikeDate(value)) {
+                    return col;
+                }
+                if (!value.isBlank()) {
+                    return col;
+                }
+            }
+            throw new ParserException("table format exception: date column not found");
+        }
+
+        private static int detectLessonNumberColumn(SheetGrid grid, int dayRow, int dateColumn) throws ParserException {
+            int maxCol = Math.min(grid.maxCol(), 80);
+            for (int col = dateColumn + 1; col <= maxCol; col++) {
+                String value = grid.getValue(dayRow, col);
+                if (isLessonNumber(value)) {
+                    return col;
+                }
+            }
+            throw new ParserException("table format exception: lesson number column not found");
+        }
+
+        private static boolean isLessonNumber(String value) {
+            if (value == null || value.isBlank()) {
+                return false;
+            }
+            for (int i = 0; i < value.length(); i++) {
+                if (!Character.isDigit(value.charAt(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static boolean looksLikeDate(String value) {
+            if (value == null || value.isBlank()) {
+                return false;
+            }
+            String v = value.toLowerCase(Locale.ROOT);
+            return v.contains("г.") || v.contains("г ") || v.matches(".*\\d{4}.*");
         }
     }
 

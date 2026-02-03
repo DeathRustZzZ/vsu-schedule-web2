@@ -154,12 +154,10 @@ pub fn mit_group_keyboard() -> InlineKeyboardMarkup {
     log::debug!("building MIT group selection keyboard");
 
     let groups = [
-        MitGroup::ISIT,
-        MitGroup::PI,
-        MitGroup::PInj,
-        MitGroup::PM,
-        MitGroup::UIR,
-        MitGroup::MF,
+        MitGroup::PI24Z1,
+        MitGroup::PI24Z2,
+        MitGroup::PI23Z1,
+        MitGroup::PI23Z2,
     ];
 
     InlineKeyboardMarkup::new(

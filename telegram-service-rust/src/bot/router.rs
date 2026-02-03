@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use chrono::{Datelike, Local};
+use chrono::{Datelike, FixedOffset, Utc};
 use log::{debug, info, warn};
 use teloxide::prelude::*;
 use teloxide::types::MessageId;
@@ -22,7 +22,12 @@ use crate::domain::registration_state::RegistrationState;
 /// Диагностически важно логировать:
 /// - старт бота
 /// - факт инициализации внешнего API (base_url логируется внутри ScheduleApi::new)
-pub async fn run(bot: Bot, db: DbFacade, schedule_api_base: String) {
+pub async fn run(
+    bot: Bot,
+    db: DbFacade,
+    schedule_api_base: String,
+    schedule_tz_offset_seconds: i32,
+) {
     info!("Запуск Telegram-бота...");
 
     let db = Arc::new(db);
@@ -47,10 +52,20 @@ pub async fn run(bot: Bot, db: DbFacade, schedule_api_base: String) {
         .branch(Update::filter_callback_query().endpoint({
             let db = Arc::clone(&db);
             let schedule_api = Arc::clone(&schedule_api);
+            let schedule_tz_offset_seconds = schedule_tz_offset_seconds;
             move |bot: Bot, q: CallbackQuery| {
                 let db = Arc::clone(&db);
                 let schedule_api = Arc::clone(&schedule_api);
-                async move { handle_callback(bot, q, db, schedule_api).await }
+                async move {
+                    handle_callback(
+                        bot,
+                        q,
+                        db,
+                        schedule_api,
+                        schedule_tz_offset_seconds,
+                    )
+                    .await
+                }
             }
         }));
 
@@ -135,6 +150,7 @@ async fn handle_callback(
     q: CallbackQuery,
     db: Arc<DbFacade>,
     schedule_api: Arc<ScheduleApi>,
+    schedule_tz_offset_seconds: i32,
 ) -> Result<(), teloxide::RequestError> {
     let data = match q.data.clone() {
         Some(data) => data,
@@ -169,6 +185,28 @@ async fn handle_callback(
         telegram_id, chat_id.0, message_id.map(|m| m.0)
     );
 
+    let user_state = match db.get_user_state(telegram_id).await {
+        Ok(state) => state,
+        Err(err) => {
+            warn!(
+                "failed to load user state for user {}: {:?}",
+                telegram_id, err
+            );
+            render_screen(
+                &bot,
+                db.as_ref(),
+                telegram_id,
+                chat_id,
+                message_id,
+                "❌ Не удалось получить состояние регистрации. Попробуй ещё раз.",
+                Some(keyboards::back_menu()),
+            )
+            .await?;
+            bot.answer_callback_query(q.id).await?;
+            return Ok(());
+        }
+    };
+
     match callback {
         Callback::Action(action) => {
             info!("action callback {:?} from user {}", action, telegram_id);
@@ -176,6 +214,7 @@ async fn handle_callback(
                 &bot,
                 db.as_ref(),
                 schedule_api.as_ref(),
+                schedule_tz_offset_seconds,
                 telegram_id,
                 chat_id,
                 message_id,
@@ -185,16 +224,45 @@ async fn handle_callback(
         }
 
         Callback::Faculty(faculty) => {
+            if !is_expected_state(&user_state, RegistrationState::AwaitingFaculty) {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "⚠️ Этот шаг регистрации устарел. Начни регистрацию заново.",
+                    Some(keyboards::main_menu(false)),
+                )
+                .await?;
+                bot.answer_callback_query(q.id).await?;
+                return Ok(());
+            }
             info!("faculty selected: '{}' by user {}", faculty.title(), telegram_id);
             debug!("persisting faculty selection into DB (user={})", telegram_id);
 
-            db.set_user_faculty(
+            if db
+                .set_user_faculty(
                 telegram_id,
                 faculty.title(),
                 RegistrationState::AwaitingStudyForm,
             )
                 .await
-                .ok();
+                .is_err()
+            {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "❌ Не удалось сохранить факультет. Попробуй ещё раз.",
+                    Some(keyboards::main_menu(false)),
+                )
+                .await?;
+                bot.answer_callback_query(q.id).await?;
+                return Ok(());
+            }
 
             render_screen(
                 &bot,
@@ -209,16 +277,45 @@ async fn handle_callback(
         }
 
         Callback::StudyForm(form) => {
+            if !is_expected_state(&user_state, RegistrationState::AwaitingStudyForm) {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "⚠️ Этот шаг регистрации устарел. Начни регистрацию заново.",
+                    Some(keyboards::main_menu(false)),
+                )
+                .await?;
+                bot.answer_callback_query(q.id).await?;
+                return Ok(());
+            }
             info!("study form selected: '{}' by user {}", form.title(), telegram_id);
             debug!("persisting study form selection into DB (user={})", telegram_id);
 
-            db.set_user_study_form(
+            if db
+                .set_user_study_form(
                 telegram_id,
                 form.title(),
                 RegistrationState::AwaitingCourse,
             )
                 .await
-                .ok();
+                .is_err()
+            {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "❌ Не удалось сохранить форму обучения. Попробуй ещё раз.",
+                    Some(keyboards::main_menu(false)),
+                )
+                .await?;
+                bot.answer_callback_query(q.id).await?;
+                return Ok(());
+            }
 
             render_screen(
                 &bot,
@@ -233,12 +330,41 @@ async fn handle_callback(
         }
 
         Callback::Course(course) => {
+            if !is_expected_state(&user_state, RegistrationState::AwaitingCourse) {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "⚠️ Этот шаг регистрации устарел. Начни регистрацию заново.",
+                    Some(keyboards::main_menu(false)),
+                )
+                .await?;
+                bot.answer_callback_query(q.id).await?;
+                return Ok(());
+            }
             info!("course selected: '{}' by user {}", course.title(), telegram_id);
             debug!("persisting course selection into DB (user={})", telegram_id);
 
-            db.set_user_course(telegram_id, course.title(), RegistrationState::AwaitingGroup)
+            if db
+                .set_user_course(telegram_id, course.title(), RegistrationState::AwaitingGroup)
                 .await
-                .ok();
+                .is_err()
+            {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "❌ Не удалось сохранить курс. Попробуй ещё раз.",
+                    Some(keyboards::main_menu(false)),
+                )
+                .await?;
+                bot.answer_callback_query(q.id).await?;
+                return Ok(());
+            }
 
             render_screen(
                 &bot,
@@ -253,6 +379,20 @@ async fn handle_callback(
         }
 
         Callback::MitGroup(group) => {
+            if !is_expected_state(&user_state, RegistrationState::AwaitingGroup) {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "⚠️ Этот шаг регистрации устарел. Начни регистрацию заново.",
+                    Some(keyboards::main_menu(false)),
+                )
+                .await?;
+                bot.answer_callback_query(q.id).await?;
+                return Ok(());
+            }
             info!("group selected: '{}' by user {}", group.title(), telegram_id);
 
             let username = q.from.username.clone();
@@ -265,7 +405,7 @@ async fn handle_callback(
                 group,
                 username,
             )
-                .await?;
+            .await?;
         }
     }
 
@@ -282,6 +422,7 @@ async fn handle_action(
     bot: &Bot,
     db: &DbFacade,
     schedule_api: &ScheduleApi,
+    schedule_tz_offset_seconds: i32,
     telegram_id: i64,
     chat_id: ChatId,
     message_id: Option<MessageId>,
@@ -304,7 +445,16 @@ async fn handle_action(
         }
         Action::MySchedule => {
             // Schedule — внешняя интеграция → самое ценное место для логов.
-            show_schedule(bot, db, schedule_api, telegram_id, chat_id, message_id).await?;
+            show_schedule(
+                bot,
+                db,
+                schedule_api,
+                schedule_tz_offset_seconds,
+                telegram_id,
+                chat_id,
+                message_id,
+            )
+            .await?;
         }
         Action::ChooseGroup => {
             // Сейчас выбор группы встроен в регистрацию.
@@ -387,9 +537,23 @@ async fn start_registration(
 ) -> Result<(), teloxide::RequestError> {
     info!("start_registration: user={} chat_id={}", telegram_id, chat_id.0);
 
-    db.reset_registration(telegram_id, RegistrationState::AwaitingFaculty)
+    if db
+        .reset_registration(telegram_id, RegistrationState::AwaitingFaculty)
         .await
-        .ok();
+        .is_err()
+    {
+        render_screen(
+            bot,
+            db,
+            telegram_id,
+            chat_id,
+            message_id,
+            "❌ Не удалось начать регистрацию. Попробуй ещё раз.",
+            Some(keyboards::main_menu(false)),
+        )
+        .await?;
+        return Ok(());
+    }
 
     render_screen(
         bot,
@@ -505,7 +669,16 @@ async fn complete_registration(
         Ok(student) => {
             info!("registration successful: user={} student_id={}", telegram_id, student.id);
 
-            db.reset_registration(telegram_id, RegistrationState::Idle).await.ok();
+            if db
+                .reset_registration(telegram_id, RegistrationState::Idle)
+                .await
+                .is_err()
+            {
+                warn!(
+                    "failed to reset registration state for user {} after success",
+                    telegram_id
+                );
+            }
 
             let text = format!(
                 "🎉 Регистрация завершена!\n\nФакультет: {}\nФорма: {}\nКурс: {}\nГруппа: {}",
@@ -598,6 +771,7 @@ async fn show_schedule(
     bot: &Bot,
     db: &DbFacade,
     schedule_api: &ScheduleApi,
+    schedule_tz_offset_seconds: i32,
     telegram_id: i64,
     chat_id: ChatId,
     message_id: Option<MessageId>,
@@ -662,7 +836,7 @@ async fn show_schedule(
 
     // Текущий день недели: используется как параметр API.
     // Логируем, чтобы понимать, что именно запрашивали у API.
-    let weekday = current_weekday_ru();
+    let weekday = current_weekday_ru(schedule_tz_offset_seconds);
     debug!(
         "schedule request context: user={} faculty={:?} group_name='{}' weekday='{}'",
         telegram_id,
@@ -794,34 +968,62 @@ fn pick_group_and_subgroup(
         return None;
     }
 
-    let needle = group_name.to_lowercase();
+    let needle = normalize_group_key(group_name);
 
-    // Fallback: если эвристика не найдёт совпадений, берём первую группу.
-    // Поведение сомнительное, но логика твоего кода такая — не меняем.
-    let mut selected = available[0].clone();
-
-    for group in available {
-        if group.group_id.to_lowercase().contains(&needle) {
-            selected = group.clone();
-            break;
-        }
+    let exact_matches: Vec<&GroupWithSubgroupsIds> = available
+        .iter()
+        .filter(|g| normalize_group_key(&g.group_id) == needle)
+        .collect();
+    if exact_matches.len() == 1 {
+        let selected = exact_matches[0].clone();
+        let subgroup = pick_subgroup(&selected, &needle)?;
+        return Some((selected.group_id.clone(), subgroup));
+    }
+    if exact_matches.len() > 1 {
+        return None;
     }
 
-    // Подгруппа:
-    // - если подгрупп нет → пустая строка (API должен корректно обработать)
-    // - иначе пытаемся найти совпадение по имени, либо берём первую подгруппу
-    let subgroup = if selected.subgroup_ids.is_empty() {
-        String::new()
-    } else {
-        selected
-            .subgroup_ids
-            .iter()
-            .find(|id| id.to_lowercase().contains(&needle))
-            .cloned()
-            .unwrap_or_else(|| selected.subgroup_ids[0].clone())
-    };
+    let contains_matches: Vec<&GroupWithSubgroupsIds> = available
+        .iter()
+        .filter(|g| normalize_group_key(&g.group_id).contains(&needle))
+        .collect();
+    if contains_matches.len() == 1 {
+        let selected = contains_matches[0].clone();
+        let subgroup = pick_subgroup(&selected, &needle)?;
+        return Some((selected.group_id.clone(), subgroup));
+    }
 
-    Some((selected.group_id, subgroup))
+    let mut subgroup_hit: Option<(String, String)> = None;
+    for group in available {
+        for subgroup in &group.subgroup_ids {
+            if normalize_group_key(subgroup) == needle {
+                if subgroup_hit.is_some() {
+                    return None;
+                }
+                subgroup_hit = Some((group.group_id.clone(), subgroup.clone()));
+            }
+        }
+    }
+    if let Some(pair) = subgroup_hit {
+        return Some(pair);
+    }
+
+    let mut subgroup_contains: Option<(String, String)> = None;
+    for group in available {
+        for subgroup in &group.subgroup_ids {
+            if normalize_group_key(subgroup).contains(&needle) {
+                if subgroup_contains.is_some() {
+                    return None;
+                }
+                subgroup_contains = Some((group.group_id.clone(), subgroup.clone()));
+            }
+        }
+    }
+    if let Some(pair) = subgroup_contains {
+        return Some(pair);
+    }
+
+    None
 }
 
 /// Форматирование расписания в текст Telegram.
@@ -887,8 +1089,10 @@ fn format_schedule_message(
 ///
 /// Это прикладная функция для UI/параметров API.
 /// Если API ожидает другой формат (например, "MONDAY"), это место нужно будет менять.
-fn current_weekday_ru() -> &'static str {
-    match Local::now().weekday() {
+fn current_weekday_ru(offset_seconds: i32) -> &'static str {
+    let offset = FixedOffset::east_opt(offset_seconds)
+        .unwrap_or_else(|| FixedOffset::east_opt(0).unwrap());
+    match Utc::now().with_timezone(&offset).weekday() {
         chrono::Weekday::Mon => "Понедельник",
         chrono::Weekday::Tue => "Вторник",
         chrono::Weekday::Wed => "Среда",
@@ -897,6 +1101,64 @@ fn current_weekday_ru() -> &'static str {
         chrono::Weekday::Sat => "Суббота",
         chrono::Weekday::Sun => "Воскресенье",
     }
+}
+
+fn normalize_group_key(value: &str) -> String {
+    value
+        .trim()
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect()
+}
+
+fn pick_subgroup(
+    selected: &GroupWithSubgroupsIds,
+    needle: &str,
+) -> Option<String> {
+    if selected.subgroup_ids.is_empty() {
+        return Some(String::new());
+    }
+    if normalize_group_key(&selected.group_id) == *needle && selected.subgroup_ids.len() > 1 {
+        return None;
+    }
+    let exact: Vec<&String> = selected
+        .subgroup_ids
+        .iter()
+        .filter(|id| normalize_group_key(id) == *needle)
+        .collect();
+    if exact.len() == 1 {
+        return Some(exact[0].clone());
+    }
+    if exact.len() > 1 {
+        return None;
+    }
+
+    let contains: Vec<&String> = selected
+        .subgroup_ids
+        .iter()
+        .filter(|id| normalize_group_key(id).contains(needle))
+        .collect();
+    if contains.len() == 1 {
+        return Some(contains[0].clone());
+    }
+
+    if selected.subgroup_ids.len() == 1 {
+        return Some(selected.subgroup_ids[0].clone());
+    }
+
+    None
+}
+
+fn is_expected_state(
+    state: &Option<crate::domain::user_state::UserState>,
+    expected: RegistrationState,
+) -> bool {
+    let state_value = state
+        .as_ref()
+        .map(|s| RegistrationState::from_str(&s.state))
+        .unwrap_or(RegistrationState::Idle);
+    state_value == expected
 }
 
 /// Нормализация факультета под контракт внешнего API.

@@ -51,26 +51,29 @@
 
     <section class="dashboard">
         <div class="top">
-            <form class="container container_dark"  enctype="multipart/form-data"  id="upload-container"  >
+                <form class="container container_dark" enctype="multipart/form-data" id="upload-container">
                 <i class="uil uil-upload"></i>
                 <div class="text">
                      <input id="file-input" type="file" name="file">
                      <label class="descr descr_dark" for="file-input">Выберите файл</label>
                      <span class="descr_src descr_src_dark">или перетащите его сюда</span>
                 </div>
-                <form class="form"  >
+                <div class="form">
                     <label class="fakult descr_dark" for="facult">Факультеты</label>
-                    <select  id="facult">
-                      <option value="1">ПсихФак</option>
-                      <option value="2">ЮрФак</option>
-                      <option value="3">Фмиит</option>
-                      <option value="4">Фгияк</option>
-                      <option value="5">ХИМБИО</option>
-                      <option value="6">ФИЗКУЛЬТУРЫ И СПОРТА</option>
-                        <option value="7">ПЕДФАК</option>
+                    <select id="facult">
+                      <option value="select" selected>Выберите факультет</option>
+                      <option value="ФМиИТ">ФМиИТ</option>
+                      <option value="Педфак">Педфак</option>
+                      <option value="ЮрФак">ЮрФак</option>
+                      <option value="ХИМБИО">Химбио</option>
+                      <option value="Физкультура">Физкультуры и спорта</option>
+                      <option value="ФГЗК">ФГЗК</option>
+                      <option value="Соцпед/псих">Соцпед/псих</option>
+                      <option value="ФИГ">ФИГ</option>
+                      <option value="ХГФ">ХГФ</option>
                     </select>
-                    <button type="button" value="Submit" class="submit_button" id="submit_button"   >Submit</button>
-              </form>
+                    <button type="button" value="Submit" class="submit_button" id="submit_button">Submit</button>
+              </div>
            </form>
         </div> 
     </section>

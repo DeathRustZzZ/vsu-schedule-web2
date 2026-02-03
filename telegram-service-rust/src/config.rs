@@ -31,6 +31,11 @@ pub struct AppConfig {
     ///
     /// Используется ботом для запроса расписания через gateway.
     pub schedule_api_base: String,
+
+    /// Смещение часового пояса для расписания (в секундах).
+    ///
+    /// Нужно, чтобы "сегодня" считалось по времени вуза, а не по времени сервера.
+    pub schedule_tz_offset_seconds: i32,
 }
 
 impl AppConfig {
@@ -67,9 +72,13 @@ impl AppConfig {
             .expect("environment variable DATABASE_URL is not set");
         log::debug!("DATABASE_URL successfully loaded");
 
-        let schedule_api_base = env::var("SCHEDULE_API_BASE")
-            .unwrap_or_else(|_| "http://api-gateway:8765".to_string());
+        let schedule_api_base =
+            env::var("SCHEDULE_API_BASE").unwrap_or_else(|_| "http://api-gateway:8765".to_string());
         log::debug!("SCHEDULE_API_BASE successfully loaded");
+
+        let schedule_tz_offset_seconds =
+            parse_timezone_offset(&env::var("SCHEDULE_TZ_OFFSET").unwrap_or_else(|_| "+03:00".to_string()));
+        log::debug!("SCHEDULE_TZ_OFFSET successfully loaded");
 
         log::info!("application configuration loaded successfully");
 
@@ -77,6 +86,23 @@ impl AppConfig {
             bot_token,
             database_url,
             schedule_api_base,
+            schedule_tz_offset_seconds,
         }
     }
+}
+
+fn parse_timezone_offset(value: &str) -> i32 {
+    let trimmed = value.trim();
+    let sign = if trimmed.starts_with('-') { -1 } else { 1 };
+    let clean = trimmed.trim_start_matches(['+', '-']);
+    let mut parts = clean.split(':');
+    let hours = parts
+        .next()
+        .and_then(|v| v.parse::<i32>().ok())
+        .unwrap_or(0);
+    let minutes = parts
+        .next()
+        .and_then(|v| v.parse::<i32>().ok())
+        .unwrap_or(0);
+    sign * (hours * 3600 + minutes * 60)
 }

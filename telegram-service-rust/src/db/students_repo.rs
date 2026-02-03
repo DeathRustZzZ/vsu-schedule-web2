@@ -6,7 +6,10 @@ pub async fn find_by_telegram_id(
     pool: &PgPool,
     telegram_id: i64,
 ) -> anyhow::Result<Option<Student>> {
-    debug!("Запрос на поиск студента telegram_id={}", telegram_id);
+    debug!(
+        "Запрос на поиск студента telegram_id={}",
+        mask_telegram_id(telegram_id)
+    );
 
     let row = sqlx::query_as::<_, Student>(
         r#"
@@ -21,11 +24,18 @@ pub async fn find_by_telegram_id(
 
     match row {
         Ok(Some(student)) => {
-            info!("Студент найден: id={}, telegram_id={}", student.id, student.telegram_id);
+            info!(
+                "Студент найден: id={}, telegram_id={}",
+                student.id,
+                mask_telegram_id(student.telegram_id)
+            );
             Ok(Some(student))
         }
         Ok(None) => {
-            info!("Студент telegram_id={} не найден.", telegram_id);
+            info!(
+                "Студент telegram_id={} не найден.",
+                mask_telegram_id(telegram_id)
+            );
             Ok(None)
         }
         Err(e) => {
@@ -45,8 +55,13 @@ pub async fn insert(
     username: Option<&str>,
 ) -> anyhow::Result<Student> {
     info!(
-        "Регистрация студента: telegram_id={}, faculty={}, group={}, study_form={}, course={:?}, username={:?}",
-        telegram_id, faculty, group_name, study_form, course, username
+        "Регистрация студента: telegram_id={}, faculty={}, group={}, study_form={}, course={:?}, has_username={}",
+        mask_telegram_id(telegram_id),
+        faculty,
+        group_name,
+        study_form,
+        course,
+        username.is_some()
     );
 
     let res = sqlx::query_as::<_, Student>(
@@ -82,4 +97,13 @@ pub async fn insert(
             Err(e.into())
         }
     }
+}
+
+fn mask_telegram_id(telegram_id: i64) -> String {
+    let value = telegram_id.abs().to_string();
+    if value.len() <= 4 {
+        return "****".to_string();
+    }
+    let tail = &value[value.len() - 4..];
+    format!("***{}", tail)
 }
