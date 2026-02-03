@@ -27,6 +27,11 @@ spring:
           predicates:
             - Path=/api/v1/schedule/uploadFile/**
 
+        - id: bot-schedule
+          uri: lb://schedule-service
+          predicates:
+            - Path=/api/v1/bot/**
+
         - id: getAvailableGroupsIdsByFaculty
           uri: lb://schedule-service
           predicates:

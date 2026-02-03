@@ -38,7 +38,7 @@ public class GroupService {
     }
 
     public ListGroupWithSubgroupsIds getAvailableGroupsByFaculty(String faculty) {
-        faculty = faculty.equals("fmiit") ? "3" : "0";
+        faculty = normalizeFaculty(faculty);
         List<Group> groupList = groupRepository.findByFaculty(faculty);
         ListGroupWithSubgroupsIds listGroupWithSubgroupsIds = new ListGroupWithSubgroupsIds();
         for(Group group : groupList) {
@@ -50,5 +50,16 @@ public class GroupService {
             listGroupWithSubgroupsIds.addGroupWithSubgroupIds(groupWithSubgroupsIds);
         }
         return listGroupWithSubgroupsIds;
+    }
+
+    private String normalizeFaculty(String faculty) {
+        if (faculty == null) {
+            return "";
+        }
+        String normalized = faculty.trim().toLowerCase();
+        if (normalized.equals("fmiit") || normalized.equals("фмиит") || normalized.equals("фмийт")) {
+            return "ФМиИТ";
+        }
+        return faculty.trim();
     }
 }

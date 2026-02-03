@@ -39,7 +39,7 @@ cargo run
 
 ## База данных
 - База: `students-db`
-- Таблицы: `students`, `user_states`, `schedule_lessons`
+- Таблицы: `students`, `user_states`
 - Миграции: `migrations/*.sql`
 
 ## Полезные файлы

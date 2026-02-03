@@ -35,6 +35,8 @@ public class ScheduleService {
 
     private final LessonRepository lessonRepository;
 
+    private final BotScheduleCacheService botScheduleCacheService;
+
     public void uploadSchedule(MultipartFile multipartFile, String faculty) {
         lessonRepository.deleteAllWhereFacultyEquals(faculty);
         File file = saveFile(multipartFile);
@@ -48,6 +50,7 @@ public class ScheduleService {
         }
         processTeachers(teachers);
         processGroups(groups,faculty);
+        botScheduleCacheService.rebuildForFaculty(faculty, groups, lessons);
 
     }
 
@@ -103,10 +106,10 @@ public class ScheduleService {
                 for (int k = 0; k < subgroup.getLessons().size(); k++) {
                     Lesson lesson = subgroup.getLessons().get(k);
                     lesson.setSubgroupId(subgroup.getId());
+                    lesson.setGroupId(group.getId());
                 }
             }
         }
         groupRepository.saveAll(groups);
     }
 }
-

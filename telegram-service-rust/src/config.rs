@@ -26,6 +26,11 @@ pub struct AppConfig {
     /// Неверное значение приведёт к падению приложения на старте,
     /// что является корректным поведением для backend-сервиса.
     pub database_url: String,
+
+    /// Базовый URL API расписания.
+    ///
+    /// Используется ботом для запроса расписания через gateway.
+    pub schedule_api_base: String,
 }
 
 impl AppConfig {
@@ -62,11 +67,16 @@ impl AppConfig {
             .expect("environment variable DATABASE_URL is not set");
         log::debug!("DATABASE_URL successfully loaded");
 
+        let schedule_api_base = env::var("SCHEDULE_API_BASE")
+            .unwrap_or_else(|_| "http://api-gateway:8765".to_string());
+        log::debug!("SCHEDULE_API_BASE successfully loaded");
+
         log::info!("application configuration loaded successfully");
 
         Self {
             bot_token,
             database_url,
+            schedule_api_base,
         }
     }
 }

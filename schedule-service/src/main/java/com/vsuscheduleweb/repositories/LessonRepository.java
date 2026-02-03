@@ -18,8 +18,19 @@ public interface LessonRepository extends JpaRepository<Lesson, UUID> {
     void deleteAllWhereFacultyEquals(String faculty);
 
     List<Lesson> findByGroupIdOrSubgroupId(String groupId, String subgroupId);
+
+    List<Lesson> findByFaculty(String faculty);
+
     @Query("SELECT l FROM lessons l WHERE (l.groupId = :groupId OR l.subgroupId = :subgroupId) AND l.weekDay = :weekDay")
     List<Lesson> findByGroupOrSubgroupAndWeekDay(
+            @Param("groupId") String groupId,
+            @Param("subgroupId") String subgroupId,
+            @Param("weekDay") String weekDay
+    );
+
+    @Query("SELECT l FROM lessons l WHERE l.faculty = :faculty AND (l.groupId = :groupId OR l.subgroupId = :subgroupId) AND l.weekDay = :weekDay")
+    List<Lesson> findByFacultyAndGroupOrSubgroupAndWeekDay(
+            @Param("faculty") String faculty,
             @Param("groupId") String groupId,
             @Param("subgroupId") String subgroupId,
             @Param("weekDay") String weekDay

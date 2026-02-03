@@ -7,6 +7,7 @@
 pub mod callbacks;
 pub mod keyboards;
 pub mod router;
+pub mod schedule_api;
 pub mod ui;
 
 use crate::db::facade::DbFacade;
@@ -23,7 +24,7 @@ use teloxide::prelude::*;
 /// - здесь **нет** бизнес-логики
 /// - функция выступает как glue-код между инфраструктурой (БД, Telegram)
 ///   и логикой обработки апдейтов
-pub async fn run_bot(bot: Bot, pool: PgPool) {
+pub async fn run_bot(bot: Bot, pool: PgPool, schedule_api_base: String) {
     log::info!("bot initialization started");
 
     // Создаём фасад доступа к базе данных.
@@ -45,7 +46,7 @@ pub async fn run_bot(bot: Bot, pool: PgPool) {
     // Эта функция, как правило, блокирует поток выполнения
     // до завершения работы бота.
     log::info!("starting update router");
-    router::run(bot, db).await;
+    router::run(bot, db, schedule_api_base).await;
 
     // Если выполнение дошло сюда — значит роутер завершил работу.
     // В нормальном режиме это происходит только при shutdown

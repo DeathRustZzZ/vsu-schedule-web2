@@ -41,12 +41,15 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/schedule-db
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=admin
+      - REDIS_URL=redis://redis:6379
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eurekaserver:8761/eureka/
     depends_on:
       eurekaserver:
         condition: service_started
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
 
   telegram-service-rust:
     image: telegram-service-rust:latest
@@ -57,6 +60,7 @@ services:
     environment:
       - BOT_TOKEN=${BOT_TOKEN}
       - DATABASE_URL=postgresql://admin:admin@students-db:5432/students-db
+      - SCHEDULE_API_BASE=http://api-gateway:8765
       - RUST_LOG=info
     depends_on:
       students-db:
@@ -99,3 +103,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - '6379:6379'
+    networks:
+      - vsu-schedule-network

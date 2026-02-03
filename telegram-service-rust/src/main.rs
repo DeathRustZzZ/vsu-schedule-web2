@@ -70,7 +70,7 @@ async fn main() {
     // Если выполнение дошло сюда — значит инициализация прошла успешно.
     // Если приложение завершится — причина почти наверняка внутри run_bot.
     log::info!("starting bot runtime");
-    run_bot(bot, pool).await;
+    run_bot(bot, pool, config.schedule_api_base.clone()).await;
 
     // Эта строка будет достигнута только если run_bot завершится.
     // В нормальном режиме работы это либо:
