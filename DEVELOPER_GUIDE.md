@@ -1,87 +1,205 @@
-# Руководство разработчика
+# Developer Guide — VSU Schedule Web
 
-## Требования
-- **Java 17** (для Spring Boot сервисов).
-- **Gradle** (для `schedule-service`, если запуск без Docker; в `api-gateway` и `eurekaserver` есть Gradle Wrapper).
-- **Docker + Docker Compose** (для локального окружения с базами).
-- **Rust** (для `telegram-service-rust`, если запуск без Docker).
-- **PostgreSQL** (если запуск без Docker).
+Полный ориентир по проекту: архитектура, запуск, окружение, данные, отладка.
 
-## Переменные окружения
-### Telegram-бот
-- `BOT_TOKEN` — токен Telegram-бота.
-- `DATABASE_URL` — строка подключения к `students-db`, например: `postgresql://admin:admin@localhost:5434/students-db`.
-- `RUST_LOG` — уровень логирования, например `info`.
+---
 
-Локально переменные удобно хранить в `.env` (файл уже используется кодом через `dotenvy`).
+## 1. Коротко о проекте
 
-## Запуск через Docker (рекомендуется)
-### 1) Все сервисы + базы
-В корне проекта:
+VSU Schedule Web — микросервисная система для работы с расписанием ВГУ.
+Состоит из:
+- **Eureka Server** — сервис обнаружения.
+- **API Gateway** — маршрутизация запросов.
+- **Schedule Service** — основной сервис расписаний (Spring Boot).
+- **Telegram Bot** — бот на Rust (teloxide).
+
+Схема (упрощённо):
+```
+Клиент
+  -> API Gateway (8765)
+       -> Schedule Service (9898) -> PostgreSQL (schedule-db)
+
+Telegram API
+  -> telegram-service-rust -> PostgreSQL (students-db)
+```
+
+---
+
+## 2. Требования
+
+### Рекомендуемый способ (Docker)
+- Docker + Docker Compose
+
+### Для локального запуска без Docker
+- Java 17
+- Gradle (или Gradle Wrapper для api-gateway/eurekaserver)
+- Rust toolchain (cargo)
+- PostgreSQL (2 базы)
+
+---
+
+## 3. Структура репозитория
+
+```
+/ (root)
+  api-gateway/           # Spring Cloud Gateway
+  eurekaserver/          # Eureka Server
+  schedule-service/      # Основной сервис расписаний
+  telegram-service-rust/ # Telegram-бот (Rust)
+  init-scripts-db/       # init скрипты schedule-db
+  init-scripts-students/ # init скрипты students-db
+  compose-env.yaml       # docker-compose окружение
+  ARCHITECTURE.md
+  README.md
+```
+
+---
+
+## 4. Запуск проекта
+
+### 4.1. Быстрый старт (Docker, все сервисы)
 ```bash
 docker compose -f compose-env.yaml up --build
 ```
-Это поднимет:
-- `eurekaserver`
-- `api-gateway`
-- `db` (PostgreSQL, `schedule-db`, порт `5432`)
-- `students-db` (PostgreSQL, `students-db`, порт `5434`)
-- `schedule-service`
-- `telegram-service-rust`
 
-## Локальный запуск без Docker
-### PostgreSQL
-Нужно поднять две базы:
-- `schedule-db` на `localhost:5432`
-- `students-db` на `localhost:5434`
+### 4.2. Запуск отдельных сервисов
+```bash
+docker compose -f compose-env.yaml up -d --build schedule-service api-gateway eurekaserver db students-db redis
+```
+
+---
+
+## 5. Порты
+
+- Eureka Server: http://localhost:8761
+- API Gateway: http://localhost:8765
+- Schedule Service: http://localhost:9898
+- PostgreSQL schedule-db: localhost:5432
+- PostgreSQL students-db: localhost:5434
+
+---
+
+## 6. Базы данных и миграции
 
 ### schedule-service
-1) Укажи параметры подключения в `schedule-service/src/main/resources/application.yaml`.
-2) Запуск (если есть установленный Gradle):
-```bash
-(cd schedule-service && gradle bootRun)
-```
-
-### eurekaserver
-```bash
-(cd eurekaserver && ./gradlew bootRun)
-```
-
-### api-gateway
-```bash
-(cd api-gateway && ./gradlew bootRun)
-```
+- Flyway миграции: `schedule-service/src/main/resources/db/migration`
 
 ### telegram-service-rust
-1) Подготовь `.env` с `BOT_TOKEN`, `DATABASE_URL`, `RUST_LOG`.
-2) Запуск:
+- Миграции: `telegram-service-rust/migrations`
+- В docker используются `init-scripts-students/*.sql`
+
+---
+
+## 7. Основные REST API (Schedule Service)
+
+- `/api/v1/groups/**`
+- `/api/v1/teachers/**`
+- `/api/v1/lessons/**`
+- `/api/v1/schedule/uploadFile` — загрузка расписаний
+- `/api/v1/groups/available/{faculty}` — список групп + подгрупп
+- `/api/v1/bot/schedule` — расписание для бота
+
+---
+
+## 8. Админ-панель
+
+- URL: `/schedule/admin`
+- UI шаблоны: `schedule-service/src/main/resources/templates/`
+- JS логика загрузки расписаний: `schedule-service/src/main/resources/static/schedule/js/`
+
+---
+
+## 9. Telegram Bot
+
+### Переменные окружения
+- `BOT_TOKEN`
+- `DATABASE_URL`
+- `RUST_LOG`
+- `SCHEDULE_API_BASE` (по умолчанию `http://api-gateway:8765`)
+- `SCHEDULE_TZ_OFFSET` (например `+03:00`)
+
+### Запуск (локально)
 ```bash
-(cd telegram-service-rust && cargo run)
+cd telegram-service-rust
+cargo run
 ```
 
-## Миграции и схема данных
-### schedule-service
-Flyway миграции находятся в:
-- `schedule-service/src/main/resources/db/migration`
+### Основные модули
+- `src/bot` — UX, маршрутизация callback
+- `src/db` — работа с БД
+- `src/domain` — доменные модели
 
-### telegram-service-rust
-SQL-миграции:
-- `telegram-service-rust/migrations`
+---
 
-При запуске через Docker также используются init-скрипты:
-- `init-scripts-students/*.sql`
+## 10. Парсер расписаний
 
-## Маршруты API Gateway
-Файл маршрутов:
-- `api-gateway/src/main/resources/routes/services-routes.yaml`
+Парсер находится в:
+- `schedule-service/src/main/java/com/vsuscheduleweb/parser/Parser.java`
 
-Основные маршруты (примеры):
-- `/api/v1/groups/**` -> `schedule-service`
-- `/api/v1/teachers/**` -> `schedule-service`
-- `/api/v1/lessons/**` -> `schedule-service`
-- `/api/v1/schedule/uploadFile` -> `schedule-service`
+Поддерживает:
+- обычное расписание (дни недели + пары)
+- зачёты/экзамены (по колонке "Дата")
 
-## Отладка и полезные заметки
-- Сервисы регистрируются в Eureka; при запуске убедись, что `eurekaserver` поднят первым.
-- В `api-gateway` настроен маршрут `/bots/index.php` на `telegram-service`, но текущая реализация бота работает через polling и не поднимает HTTP-сервер.
-- Порты по умолчанию: `8761` (Eureka), `8765` (Gateway), `9898` (schedule-service), `5432` и `5434` (PostgreSQL).
+---
+
+## 11. Как загрузить расписание
+
+1. Открыть `/schedule/admin`
+2. Выбрать факультет
+3. Загрузить Excel файл
+
+В случае успеха данные сохраняются в `schedule-db`, кэш в Redis обновляется.
+
+---
+
+## 12. Частые проблемы
+
+### ❌ "Не видно групп" в Telegram
+Проверь:
+- корректно ли загружены расписания в schedule-service
+- работает ли `/api/v1/groups/available/{faculty}`
+- корректная нормализация факультета
+
+### ❌ Ошибка загрузки расписания
+Чаще всего:
+- неверный формат Excel
+- таблица не соответствует ожидаемой структуре
+
+---
+
+## 13. Разработка
+
+### Полезные команды
+
+#### Локально (Java)
+```bash
+cd schedule-service
+./gradlew bootRun
+```
+
+#### Локально (Rust)
+```bash
+cd telegram-service-rust
+cargo run
+```
+
+---
+
+## 14. Рекомендуемый workflow
+
+1. Разработка изменений в сервисе
+2. Локальная проверка
+3. Пересборка контейнера нужного сервиса
+4. Smoke-тест через API
+
+---
+
+## 15. Где искать
+
+- Архитектура: `ARCHITECTURE.md`
+- Быстрый старт: `README.md`
+- Конфиги: `compose-env.yaml`
+
+---
+
+Если нужно добавить новые сервисы или расширять API — лучше фиксировать изменения в этом гайде.
