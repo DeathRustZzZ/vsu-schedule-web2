@@ -27,7 +27,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/schedule/auth", "/schedule/auth/logout")
+                        .ignoringRequestMatchers("/schedule/auth", "/schedule/auth/logout", "/api/v1/**")
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(

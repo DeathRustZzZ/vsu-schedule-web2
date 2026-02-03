@@ -46,7 +46,10 @@ public class Parser {
     private static final Pattern SUBGROUP_PATTERN = Pattern.compile(".+_\\d+");
     private static final Pattern TIME_RANGE_PATTERN =
             Pattern.compile("\\(?\\s*(\\d{1,2}[:.]\\d{2})\\s*-\\s*(\\d{1,2}[:.]\\d{2})\\s*\\)?");
+    private static final Pattern TIME_ONLY_PATTERN = Pattern.compile("\\b(\\d{1,2}[:.]\\d{2})\\b");
     private static final Pattern QUALIFICATION_PATTERN = Pattern.compile("\\(([^)]*)\\)\\s*$");
+    private static final Pattern DATE_PATTERN = Pattern.compile("(\\d{1,2}[./]\\d{1,2}[./]\\d{2,4})");
+    private static final Pattern TEACHER_LINE_PATTERN = Pattern.compile("([А-ЯЁ][а-яё]+)\\s+[А-ЯЁ]\\.?\\s*[А-ЯЁ]\\.?"); 
 
     private List<Teacher> teachers = new ArrayList<>();
     private List<Group> groups = new ArrayList<>();
@@ -83,9 +86,18 @@ public class Parser {
             Sheet sheet = wb.getSheetAt(0);
             SheetGrid grid = new SheetGrid(sheet);
 
-            Header header = Header.detect(grid);
-            ParseContext context = buildGroups(header, grid, faculty);
-            parseLessons(header, grid, context);
+            try {
+                Header header = Header.detect(grid);
+                ParseContext context = buildGroups(header, grid, faculty);
+                parseLessons(header, grid, context);
+            } catch (ParserException ex) {
+                ExamHeader examHeader = ExamHeader.detect(grid);
+                if (examHeader == null) {
+                    throw ex;
+                }
+                ParseContext context = buildGroups(examHeader, grid, faculty);
+                parseExamLessons(examHeader, grid, context);
+            }
         } finally {
             try {
                 wb.close();
@@ -96,20 +108,34 @@ public class Parser {
     }
 
     private ParseContext buildGroups(Header header, SheetGrid grid, String faculty) throws ParserException {
+        return buildGroups(header.subgroupRow, header.groupRow, header.nameRow, header.subgroupColumns, grid, faculty);
+    }
+
+    private ParseContext buildGroups(ExamHeader header, SheetGrid grid, String faculty) throws ParserException {
+        return buildGroups(header.subgroupRow, header.groupRow, header.nameRow, header.subgroupColumns, grid, faculty);
+    }
+
+    private ParseContext buildGroups(int subgroupRow,
+                                     int groupRow,
+                                     int nameRow,
+                                     List<Integer> subgroupColumns,
+                                     SheetGrid grid,
+                                     String faculty) throws ParserException {
         Map<Integer, Subgroup> subgroupByCol = new HashMap<>();
+        Map<String, Subgroup> subgroupById = new HashMap<>();
         Map<String, Group> groupById = new HashMap<>();
         Map<Integer, String> groupIdByCol = new HashMap<>();
 
-        for (int col : header.subgroupColumns) {
-            String subgroupId = grid.getValue(header.subgroupRow, col);
+        for (int col : subgroupColumns) {
+            String subgroupId = grid.getValue(subgroupRow, col);
             if (subgroupId.isBlank()) {
                 continue;
             }
-            String groupId = grid.findNearestLeftValue(header.groupRow, col, header.subgroupColumns);
+            String groupId = grid.findNearestLeftValue(groupRow, col, subgroupColumns);
             if (groupId.isBlank()) {
                 throw new ParserException("table format exception: group id missing for subgroup " + subgroupId);
             }
-            String groupName = grid.findNearestLeftValue(header.nameRow, col, header.subgroupColumns);
+            String groupName = grid.findNearestLeftValue(nameRow, col, subgroupColumns);
             if (groupName.isBlank()) {
                 groupName = groupId;
             }
@@ -127,11 +153,12 @@ public class Parser {
             group.addSubgroup(subgroup);
 
             subgroupByCol.put(col, subgroup);
+            subgroupById.put(subgroupId, subgroup);
             groupIdByCol.put(col, groupId);
         }
 
         groups.addAll(groupById.values());
-        return new ParseContext(subgroupByCol, groupById, groupIdByCol);
+        return new ParseContext(subgroupByCol, subgroupById, groupById, groupIdByCol);
     }
 
     private void parseLessons(Header header, SheetGrid grid, ParseContext context) throws ParserException {
@@ -170,47 +197,159 @@ public class Parser {
                         processedMerged.add(key);
                     }
 
-                    String lessonNameCell = grid.getValue(row, col);
+                    List<Integer> coveredCols = merged == null
+                            ? List.of(col)
+                            : header.subgroupColumns.stream()
+                            .filter(c -> c >= merged.getFirstColumn() + 1 && c <= merged.getLastColumn() + 1)
+                            .toList();
+
+                    if (coveredCols.isEmpty()) {
+                        continue;
+                    }
+
+                    int sourceCol = coveredCols.get(0);
+                    String lessonNameCell = grid.getValue(row, sourceCol);
                     if (lessonNameCell.isBlank()) {
                         continue;
                     }
 
-                    Lesson lesson = parseLesson(lessonNameCell);
-                    lesson.setDate(date)
-                            .setWeekDay(day)
-                            .setStartTime(timeRange.start)
-                            .setEndTime(timeRange.end)
-                            .setId(UUID.randomUUID());
+                    String teacherCell = grid.getValue(row + 1, sourceCol);
+                    String auditorium = grid.getValue(row + 2, sourceCol);
 
-                    boolean isCommon = false;
-                    String groupId = context.groupIdByCol.get(col);
-                    Group group = groupId == null ? null : context.groupById.get(groupId);
-                    if (merged != null) {
-                        List<Integer> coveredCols = header.subgroupColumns.stream()
-                                .filter(c -> c >= merged.getFirstColumn() + 1 && c <= merged.getLastColumn() + 1)
-                                .toList();
-                        if (coveredCols.size() >= 2) {
-                            isCommon = true;
-                            int leaderCol = coveredCols.get(0);
-                            String leaderGroupId = context.groupIdByCol.get(leaderCol);
-                            group = leaderGroupId == null ? null : context.groupById.get(leaderGroupId);
+                    Map<String, List<String>> subgroupsByGroup = new HashMap<>();
+                    for (int coveredCol : coveredCols) {
+                        String groupId = context.groupIdByCol.get(coveredCol);
+                        if (groupId == null) {
+                            continue;
+                        }
+                        Subgroup subgroup = context.subgroupByCol.get(coveredCol);
+                        if (subgroup != null) {
+                            subgroupsByGroup.computeIfAbsent(groupId, k -> new ArrayList<>()).add(subgroup.getId());
                         }
                     }
 
+                    for (Map.Entry<String, List<String>> entry : subgroupsByGroup.entrySet()) {
+                        String groupId = entry.getKey();
+                        Group group = context.groupById.get(groupId);
+                        if (group == null) {
+                            throw new ParserException("table format exception: cannot resolve group for column " + col);
+                        }
+
+                        List<String> subgroupIds = entry.getValue();
+                        boolean isCommon = subgroupIds.size() >= 2;
+
+                        Lesson lesson = parseLesson(lessonNameCell);
+                        lesson.setDate(date)
+                                .setWeekDay(day)
+                                .setStartTime(timeRange.start)
+                                .setEndTime(timeRange.end)
+                                .setId(UUID.randomUUID())
+                                .setGroupId(groupId);
+
+                        if (!auditorium.isBlank()) {
+                            lesson.setAuditorium(auditorium);
+                        }
+
+                        if (isCommon) {
+                            group.addLesson(lesson);
+                        } else if (subgroupIds.size() == 1) {
+                            Subgroup subgroup = context.subgroupById.get(subgroupIds.get(0));
+                            if (subgroup != null) {
+                                lesson.setSubgroupId(subgroup.getId());
+                                subgroup.addLesson(lesson);
+                            }
+                        }
+
+                        lessons.add(lesson);
+                        parseTeachers(teacherCell, lesson);
+                    }
+                }
+            }
+        }
+    }
+
+    private void parseExamLessons(ExamHeader header, SheetGrid grid, ParseContext context) throws ParserException {
+        for (int row = header.dateRow + 1; row <= grid.maxRow(); row++) {
+            String dateCell = grid.getValue(row, header.dateColumn);
+            if (dateCell.isBlank()) {
+                continue;
+            }
+
+            DateDay dateDay = parseDateDay(dateCell);
+            if (dateDay.date == null && dateDay.day == null) {
+                continue;
+            }
+
+            Set<String> processedMerged = new HashSet<>();
+            for (int col : header.subgroupColumns) {
+                CellRangeAddress merged = grid.getMergedRegion(row, col);
+                if (merged != null) {
+                    String key = merged.formatAsString();
+                    if (processedMerged.contains(key)) {
+                        continue;
+                    }
+                    processedMerged.add(key);
+                }
+
+                List<Integer> coveredCols = merged == null
+                        ? List.of(col)
+                        : header.subgroupColumns.stream()
+                        .filter(c -> c >= merged.getFirstColumn() + 1 && c <= merged.getLastColumn() + 1)
+                        .toList();
+
+                if (coveredCols.isEmpty()) {
+                    continue;
+                }
+
+                int sourceCol = coveredCols.get(0);
+                String cell = grid.getValue(row, sourceCol);
+                if (cell.isBlank()) {
+                    continue;
+                }
+
+                ExamCell examCell = parseExamCell(cell);
+                if (examCell.name == null || examCell.name.isBlank()) {
+                    continue;
+                }
+
+                Map<String, List<String>> subgroupsByGroup = new HashMap<>();
+                for (int coveredCol : coveredCols) {
+                    String groupId = context.groupIdByCol.get(coveredCol);
+                    if (groupId == null) {
+                        continue;
+                    }
+                    Subgroup subgroup = context.subgroupByCol.get(coveredCol);
+                    if (subgroup != null) {
+                        subgroupsByGroup.computeIfAbsent(groupId, k -> new ArrayList<>()).add(subgroup.getId());
+                    }
+                }
+
+                for (Map.Entry<String, List<String>> entry : subgroupsByGroup.entrySet()) {
+                    String groupId = entry.getKey();
+                    Group group = context.groupById.get(groupId);
                     if (group == null) {
                         throw new ParserException("table format exception: cannot resolve group for column " + col);
                     }
 
-                    lesson.setGroupId(group.getId());
-                    String auditorium = grid.getValue(row + 2, col);
-                    if (!auditorium.isBlank()) {
-                        lesson.setAuditorium(auditorium);
+                    List<String> subgroupIds = entry.getValue();
+                    boolean isCommon = subgroupIds.size() >= 2;
+
+                    Lesson lesson = parseLesson(examCell.name);
+                    lesson.setDate(dateDay.date != null ? dateDay.date : "")
+                            .setWeekDay(dateDay.day != null ? dateDay.day : "")
+                            .setStartTime(examCell.time != null ? examCell.time : "")
+                            .setEndTime("")
+                            .setId(UUID.randomUUID())
+                            .setGroupId(groupId);
+
+                    if (examCell.auditorium != null && !examCell.auditorium.isBlank()) {
+                        lesson.setAuditorium(examCell.auditorium);
                     }
 
                     if (isCommon) {
                         group.addLesson(lesson);
-                    } else {
-                        Subgroup subgroup = context.subgroupByCol.get(col);
+                    } else if (subgroupIds.size() == 1) {
+                        Subgroup subgroup = context.subgroupById.get(subgroupIds.get(0));
                         if (subgroup != null) {
                             lesson.setSubgroupId(subgroup.getId());
                             subgroup.addLesson(lesson);
@@ -218,7 +357,9 @@ public class Parser {
                     }
 
                     lessons.add(lesson);
-                    parseTeachers(grid.getValue(row + 1, col), lesson);
+                    if (examCell.teacher != null && !examCell.teacher.isBlank()) {
+                        parseTeachers(examCell.teacher, lesson);
+                    }
                 }
             }
         }
@@ -228,15 +369,19 @@ public class Parser {
         if (raw == null || raw.isBlank()) {
             return;
         }
-        if (!raw.contains(",")) {
-            Teacher teacher = parseTeacher(raw);
+        String normalized = normalizeTeacherLine(raw);
+        if (normalized.isBlank()) {
+            return;
+        }
+        if (!normalized.contains(",")) {
+            Teacher teacher = parseTeacher(normalized);
             if (teacher != null) {
                 teacher.addLesson(lesson);
                 teachers.add(teacher);
             }
             return;
         }
-        for (String token : splitManyTeachersToList(raw)) {
+        for (String token : splitManyTeachersToList(normalized)) {
             Teacher teacher = parseTeacher(token);
             if (teacher != null) {
                 teacher.addLesson(lesson);
@@ -280,6 +425,12 @@ public class Parser {
                 .map(String::trim)
                 .filter(token -> !token.isBlank())
                 .toList();
+    }
+
+    private String normalizeTeacherLine(String value) {
+        String v = value.trim();
+        v = v.replaceAll("^(доц\\.|проф\\.|ст\\.преп\\.|ст\\.пр\\.|преп\\.|асс\\.|канд\\.[^\\s]*\\s+|д-р\\s+|докт\\.[^\\s]*\\s+)+", "");
+        return v.trim();
     }
 
     private String parseLessonName(String cellValue) {
@@ -351,6 +502,7 @@ public class Parser {
 
     private record ParseContext(
             Map<Integer, Subgroup> subgroupByCol,
+            Map<String, Subgroup> subgroupById,
             Map<String, Group> groupById,
             Map<Integer, String> groupIdByCol
     ) {}
@@ -459,10 +611,12 @@ public class Parser {
                     }
                 }
             }
+            int maxHits = columnHits.values().stream().mapToInt(Integer::intValue).max().orElse(0);
             return columnHits.entrySet()
                     .stream()
-                    .max(Map.Entry.comparingByValue())
+                    .filter(entry -> entry.getValue() == maxHits)
                     .map(Map.Entry::getKey)
+                    .min(Integer::compareTo)
                     .orElseThrow(() -> new ParserException("table format exception: day column not found"));
         }
 
@@ -471,6 +625,10 @@ public class Parser {
             for (int row = 1; row <= grid.maxRow(); row++) {
                 String value = grid.getValue(row, dayColumn);
                 if (DAY_NAMES.contains(value)) {
+                    String prev = grid.getValue(row - 1, dayColumn);
+                    if (DAY_NAMES.contains(prev) && prev.equals(value)) {
+                        continue;
+                    }
                     rows.add(row);
                 }
             }
@@ -522,6 +680,150 @@ public class Parser {
             return v.contains("г.") || v.contains("г ") || v.matches(".*\\d{4}.*");
         }
     }
+
+    private record ExamHeader(
+            int subgroupRow,
+            int groupRow,
+            int nameRow,
+            List<Integer> subgroupColumns,
+            int dateRow,
+            int dateColumn
+    ) {
+        private static ExamHeader detect(SheetGrid grid) {
+            int maxRow = Math.min(grid.maxRow(), 80);
+            int maxCol = Math.min(grid.maxCol(), 80);
+
+            int dateRow = -1;
+            int dateColumn = -1;
+            for (int row = 1; row <= maxRow; row++) {
+                for (int col = 1; col <= maxCol; col++) {
+                    String value = grid.getValue(row, col).trim();
+                    if (value.equalsIgnoreCase("дата")) {
+                        dateRow = row;
+                        dateColumn = col;
+                        break;
+                    }
+                }
+                if (dateRow > 0) {
+                    break;
+                }
+            }
+
+            if (dateRow < 0) {
+                return null;
+            }
+
+            List<Integer> bestColumns = List.of();
+            int subgroupRow = -1;
+            for (int row = 1; row <= maxRow; row++) {
+                List<Integer> cols = new ArrayList<>();
+                for (int col = 1; col <= maxCol; col++) {
+                    String value = grid.getValue(row, col);
+                    if (SUBGROUP_PATTERN.matcher(value).matches()) {
+                        cols.add(col);
+                    }
+                }
+                if (cols.size() >= 2 && cols.size() > bestColumns.size()) {
+                    bestColumns = cols;
+                    subgroupRow = row;
+                }
+            }
+
+            if (subgroupRow < 0) {
+                return null;
+            }
+
+            int groupRow = findHeaderRowAbove(grid, subgroupRow - 1, bestColumns);
+            int nameRow = findHeaderRowAbove(grid, groupRow - 1, bestColumns);
+
+            return new ExamHeader(
+                    subgroupRow,
+                    groupRow,
+                    nameRow,
+                    bestColumns,
+                    dateRow,
+                    dateColumn
+            );
+        }
+
+        private static int findHeaderRowAbove(SheetGrid grid, int startRow, List<Integer> subgroupColumns) {
+            for (int row = startRow; row >= 1; row--) {
+                boolean any = false;
+                for (int col : subgroupColumns) {
+                    if (!grid.getValue(row, col).isBlank()) {
+                        any = true;
+                        break;
+                    }
+                }
+                if (any) {
+                    return row;
+                }
+            }
+            return -1;
+        }
+    }
+
+    private record ExamCell(String name, String teacher, String auditorium, String time) {}
+
+    private ExamCell parseExamCell(String value) {
+        String[] rawLines = value.split("\\r?\\n");
+        List<String> lines = new ArrayList<>();
+        for (String line : rawLines) {
+            String trimmed = line.trim();
+            if (!trimmed.isBlank()) {
+                lines.add(trimmed);
+            }
+        }
+        if (lines.isEmpty()) {
+            return new ExamCell("", "", "", "");
+        }
+
+        String name = lines.get(0);
+        String teacher = "";
+        String auditorium = "";
+        String time = "";
+
+        for (String line : lines) {
+            if (teacher.isBlank() && (line.contains("доц.") || line.contains("проф.") || line.contains("преп.")
+                    || TEACHER_LINE_PATTERN.matcher(line).find())) {
+                teacher = line;
+            }
+            if (auditorium.isBlank() && line.toLowerCase(Locale.ROOT).contains("ауд")) {
+                int comma = line.indexOf(',');
+                auditorium = comma > 0 ? line.substring(0, comma).trim() : line.trim();
+                Matcher tm = TIME_ONLY_PATTERN.matcher(line);
+                if (tm.find()) {
+                    time = tm.group(1).replace('.', ':');
+                }
+            }
+            if (time.isBlank()) {
+                Matcher tm = TIME_ONLY_PATTERN.matcher(line);
+                if (tm.find()) {
+                    time = tm.group(1).replace('.', ':');
+                }
+            }
+        }
+
+        return new ExamCell(name, teacher, auditorium, time);
+    }
+
+    private DateDay parseDateDay(String value) {
+        String date = null;
+        String day = null;
+        Matcher dateMatcher = DATE_PATTERN.matcher(value);
+        if (dateMatcher.find()) {
+            date = dateMatcher.group(1);
+        }
+        for (String dayName : DAY_NAMES) {
+            if (value.contains(dayName)) {
+                day = dayName;
+                break;
+            }
+        }
+        return new DateDay(date, day);
+    }
+
+    private record DateDay(String date, String day) {}
 
     private static final class SheetGrid {
         private final Sheet sheet;
