@@ -118,6 +118,8 @@ pub enum Callback {
     StudyForm(StudyForm),
     Course(Course),
     MitGroup(MitGroup),
+    GroupId(String),
+    SubgroupId(String),
 }
 
 impl FromStr for Callback {
@@ -148,6 +150,12 @@ impl FromStr for Callback {
         }
         if let Ok(course) = Course::from_str(s) {
             return Ok(Callback::Course(course));
+        }
+        if let Some(rest) = s.strip_prefix("group:") {
+            return Ok(Callback::GroupId(rest.to_string()));
+        }
+        if let Some(rest) = s.strip_prefix("subgroup:") {
+            return Ok(Callback::SubgroupId(rest.to_string()));
         }
         if let Ok(group) = MitGroup::from_str(s) {
             return Ok(Callback::MitGroup(group));

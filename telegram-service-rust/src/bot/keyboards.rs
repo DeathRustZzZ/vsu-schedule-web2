@@ -1,12 +1,8 @@
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
 use crate::bot::callbacks::Action;
-use crate::domain::{
-    course::Course,
-    faculty::Faculty,
-    groups::mit::MitGroup,
-    study_form::StudyForm,
-};
+use crate::bot::schedule_api::GroupWithSubgroupsIds;
+use crate::domain::{course::Course, faculty::Faculty, groups::mit::MitGroup, study_form::StudyForm};
 
 /// Главное меню бота.
 ///
@@ -169,4 +165,28 @@ pub fn mit_group_keyboard() -> InlineKeyboardMarkup {
             })
             .collect::<Vec<_>>(),
     )
+}
+
+/// Клавиатура выбора группы, загружаемой из внешнего Schedule API.
+pub fn groups_keyboard(groups: &[GroupWithSubgroupsIds]) -> InlineKeyboardMarkup {
+    let mut rows = Vec::new();
+    for group in groups {
+        rows.push(vec![InlineKeyboardButton::callback(
+            group.group_id.clone(),
+            format!("group:{}", group.group_id),
+        )]);
+    }
+    InlineKeyboardMarkup::new(rows)
+}
+
+/// Клавиатура выбора подгруппы.
+pub fn subgroups_keyboard(subgroups: &[String]) -> InlineKeyboardMarkup {
+    let mut rows = Vec::new();
+    for subgroup in subgroups {
+        rows.push(vec![InlineKeyboardButton::callback(
+            subgroup.clone(),
+            format!("subgroup:{}", subgroup),
+        )]);
+    }
+    InlineKeyboardMarkup::new(rows)
 }

@@ -366,6 +366,47 @@ async fn handle_callback(
                 return Ok(());
             }
 
+            let raw_faculty = user_state
+                .as_ref()
+                .and_then(|s| s.faculty())
+                .unwrap_or("ФМиИТ");
+            let faculty = normalize_faculty(raw_faculty).unwrap_or(raw_faculty);
+
+            let available = match schedule_api.get_available_groups(faculty).await {
+                Ok(list) => list.list,
+                Err(err) => {
+                    warn!("Failed to load groups list: {:?}", err);
+                    render_screen(
+                        &bot,
+                        db.as_ref(),
+                        telegram_id,
+                        chat_id,
+                        message_id,
+                        "❌ Не удалось получить список групп.",
+                        Some(keyboards::main_menu(false)),
+                    )
+                    .await?;
+                    bot.answer_callback_query(q.id).await?;
+                    return Ok(());
+                }
+            };
+
+            let filtered = filter_groups_by_course(&available, course);
+            if filtered.is_empty() {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "❌ Не удалось подобрать группы для выбранного курса.",
+                    Some(keyboards::main_menu(false)),
+                )
+                .await?;
+                bot.answer_callback_query(q.id).await?;
+                return Ok(());
+            }
+
             render_screen(
                 &bot,
                 db.as_ref(),
@@ -373,9 +414,9 @@ async fn handle_callback(
                 chat_id,
                 message_id,
                 &format!("✅ Курс: {}\n\nТеперь выбери группу:", course.title()),
-                Some(keyboards::mit_group_keyboard()),
+                Some(keyboards::groups_keyboard(&filtered)),
             )
-                .await?;
+            .await?;
         }
 
         Callback::MitGroup(group) => {
@@ -402,7 +443,128 @@ async fn handle_callback(
                 telegram_id,
                 chat_id,
                 message_id,
-                group,
+                group.title().to_string(),
+                username,
+            )
+            .await?;
+        }
+
+        Callback::GroupId(group_id) => {
+            if !is_expected_state(&user_state, RegistrationState::AwaitingGroup) {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "⚠️ Этот шаг регистрации устарел. Начни регистрацию заново.",
+                    Some(keyboards::main_menu(false)),
+                )
+                .await?;
+                bot.answer_callback_query(q.id).await?;
+                return Ok(());
+            }
+
+            let raw_faculty = user_state
+                .as_ref()
+                .and_then(|s| s.faculty())
+                .unwrap_or("ФМиИТ");
+            let faculty = normalize_faculty(raw_faculty).unwrap_or(raw_faculty);
+
+            let available = match schedule_api.get_available_groups(faculty).await {
+                Ok(list) => list.list,
+                Err(err) => {
+                    warn!("Failed to load groups list: {:?}", err);
+                    render_screen(
+                        &bot,
+                        db.as_ref(),
+                        telegram_id,
+                        chat_id,
+                        message_id,
+                        "❌ Не удалось получить список групп.",
+                        Some(keyboards::main_menu(false)),
+                    )
+                    .await?;
+                    bot.answer_callback_query(q.id).await?;
+                    return Ok(());
+                }
+            };
+
+            let selected = available.iter().find(|g| g.group_id == group_id);
+            if let Some(selected) = selected {
+                if selected.subgroup_ids.len() > 1 {
+                    render_screen(
+                        &bot,
+                        db.as_ref(),
+                        telegram_id,
+                        chat_id,
+                        message_id,
+                        &format!("✅ Группа: {}\n\nТеперь выбери подгруппу:", selected.group_id),
+                        Some(keyboards::subgroups_keyboard(&selected.subgroup_ids)),
+                    )
+                    .await?;
+                } else if selected.subgroup_ids.len() == 1 {
+                    let username = q.from.username.clone();
+                    complete_registration(
+                        &bot,
+                        db.as_ref(),
+                        telegram_id,
+                        chat_id,
+                        message_id,
+                        selected.subgroup_ids[0].clone(),
+                        username,
+                    )
+                    .await?;
+                } else {
+                    let username = q.from.username.clone();
+                    complete_registration(
+                        &bot,
+                        db.as_ref(),
+                        telegram_id,
+                        chat_id,
+                        message_id,
+                        selected.group_id.clone(),
+                        username,
+                    )
+                    .await?;
+                }
+            } else {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "❌ Не удалось подобрать группу. Попробуй ещё раз.",
+                    Some(keyboards::main_menu(false)),
+                )
+                .await?;
+            }
+        }
+
+        Callback::SubgroupId(subgroup_id) => {
+            if !is_expected_state(&user_state, RegistrationState::AwaitingGroup) {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "⚠️ Этот шаг регистрации устарел. Начни регистрацию заново.",
+                    Some(keyboards::main_menu(false)),
+                )
+                .await?;
+                bot.answer_callback_query(q.id).await?;
+                return Ok(());
+            }
+            let username = q.from.username.clone();
+            complete_registration(
+                &bot,
+                db.as_ref(),
+                telegram_id,
+                chat_id,
+                message_id,
+                subgroup_id,
                 username,
             )
             .await?;
@@ -577,13 +739,13 @@ async fn complete_registration(
     telegram_id: i64,
     chat_id: ChatId,
     message_id: Option<MessageId>,
-    group: crate::domain::groups::mit::MitGroup,
+    group_name: String,
     username: Option<String>,
 ) -> Result<(), teloxide::RequestError> {
     info!(
         "complete_registration: user={} group='{}' chat_id={}",
         telegram_id,
-        group.title(),
+        group_name,
         chat_id.0
     );
 
@@ -651,7 +813,7 @@ async fn complete_registration(
         faculty,
         study_form,
         course,
-        group.title(),
+        group_name,
         username
     );
 
@@ -659,7 +821,7 @@ async fn complete_registration(
         .register_student(
             telegram_id,
             faculty,
-            group.title(),
+            &group_name,
             study_form,
             course,
             username.as_deref(),
@@ -1110,6 +1272,43 @@ fn normalize_group_key(value: &str) -> String {
         .chars()
         .filter(|c| c.is_alphanumeric())
         .collect()
+}
+
+fn filter_groups_by_course(
+    available: &[GroupWithSubgroupsIds],
+    course: crate::domain::course::Course,
+) -> Vec<GroupWithSubgroupsIds> {
+    let course_number = match course {
+        crate::domain::course::Course::First => 1,
+        crate::domain::course::Course::Second => 2,
+        crate::domain::course::Course::Third => 3,
+        crate::domain::course::Course::Fourth => 4,
+    };
+
+    let year = Utc::now().year() % 100;
+    let expected = year - course_number;
+
+    let mut filtered: Vec<GroupWithSubgroupsIds> = available
+        .iter()
+        .cloned()
+        .filter(|g| group_year_prefix(&g.group_id) == Some(expected))
+        .collect();
+
+    if filtered.is_empty() {
+        filtered = available.to_vec();
+    }
+
+    filtered.sort_by(|a, b| a.group_id.cmp(&b.group_id));
+    filtered
+}
+
+fn group_year_prefix(group_id: &str) -> Option<i32> {
+    let digits: String = group_id.chars().take_while(|c| c.is_ascii_digit()).collect();
+    if digits.len() >= 2 {
+        digits[..2].parse::<i32>().ok()
+    } else {
+        None
+    }
 }
 
 fn pick_subgroup(
