@@ -16,6 +16,7 @@ use crate::domain::{
 /// Это разделение критично:
 /// - title может меняться из-за UX/локализации/эмодзи
 /// - callback должен быть максимально стабильным, иначе сломаются старые сообщения/кнопки
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     MainMenu,
