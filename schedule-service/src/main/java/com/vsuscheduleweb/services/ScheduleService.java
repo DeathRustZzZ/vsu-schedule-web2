@@ -23,8 +23,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 @Service
@@ -79,23 +82,80 @@ public class ScheduleService {
     }
 
     private void processTeachers(List<Teacher> teachers) {
-        teachers.forEach(teacher -> {
+        Map<String, Teacher> mergedTeachers = new LinkedHashMap<>();
+        for (Teacher teacher : teachers) {
+            String initials = normalizeInitials(teacher.getInitials());
+            String lastname = normalizeLastname(teacher.getLastname());
+            if (initials.isBlank() && lastname.isBlank()) {
+                continue;
+            }
+            String key = (lastname + "|" + initials).toLowerCase(Locale.ROOT);
+            Teacher existing = mergedTeachers.get(key);
+            if (existing == null) {
+                Teacher copy = new Teacher();
+                copy.setLastname(lastname);
+                copy.setInitials(initials);
+                copy.setQualification(teacher.getQualification());
+                copy.setFirstname(teacher.getFirstname());
+                copy.setSurname(teacher.getSurname());
+                copy.setFullname(teacher.getFullname());
+                copy.getLessons().addAll(teacher.getLessons());
+                mergedTeachers.put(key, copy);
+            } else {
+                existing.getLessons().addAll(teacher.getLessons());
+            }
+        }
+
+        Integer maxId = teacherRepository.findMaxId();
+        AtomicInteger nextId = new AtomicInteger((maxId == null ? -1 : maxId) + 1);
+
+        mergedTeachers.values().forEach(teacher -> {
             try {
-                Optional<Teacher> opt_teacher = teacherRepository.findByInitialsAndLastname(teacher.getInitials(),
-                        teacher.getLastname().toUpperCase(Locale.ROOT));
+                String initials = normalizeInitials(teacher.getInitials());
+                String lastname = normalizeLastname(teacher.getLastname());
+                Optional<Teacher> opt_teacher = teacherRepository.findByInitialsAndLastnameIgnoreCase(
+                        initials,
+                        lastname
+                );
                 if (opt_teacher.isPresent()) {
                     Teacher teacherDb = opt_teacher.get();
-                    teacher.getLessons().forEach(lesson -> {
-                        lesson.setTeacherId(teacherDb.getId());
-                    });
+                    teacher.getLessons().forEach(lesson -> lesson.setTeacherId(teacherDb.getId()));
                     teacherDb.setLessons(teacher.getLessons());
                     teacherRepository.save(teacherDb);
+                } else {
+                    teacher.setId(nextId.getAndIncrement());
+                    teacher.setLastname(lastname);
+                    teacher.setInitials(initials);
+                    teacher.setFirstname(defaultString(teacher.getFirstname()));
+                    teacher.setSurname(defaultString(teacher.getSurname()));
+                    if (teacher.getFullname() == null || teacher.getFullname().isBlank()) {
+                        teacher.setFullname((lastname + " " + initials).trim());
+                    }
+                    teacher.getLessons().forEach(lesson -> lesson.setTeacherId(teacher.getId()));
+                    teacherRepository.save(teacher);
                 }
             } catch (IncorrectResultSizeDataAccessException e) {
                 log.error(e.getMessage());
             }
         });
+    }
 
+    private String defaultString(String value) {
+        return value == null ? "" : value;
+    }
+
+    private String normalizeInitials(String initials) {
+        if (initials == null) {
+            return "";
+        }
+        return initials.replaceAll("\\s+", "").trim();
+    }
+
+    private String normalizeLastname(String lastname) {
+        if (lastname == null) {
+            return "";
+        }
+        return lastname.trim();
     }
 
     private void processGroups(List<Group> groups, String faculty) {

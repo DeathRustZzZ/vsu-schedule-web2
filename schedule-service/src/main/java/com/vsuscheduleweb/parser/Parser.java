@@ -6,6 +6,7 @@ import com.vsuscheduleweb.entity.Lesson;
 import com.vsuscheduleweb.entity.Subgroup;
 import com.vsuscheduleweb.entity.Teacher;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
@@ -31,6 +32,7 @@ import java.util.regex.Pattern;
 
 @NoArgsConstructor
 @Component
+@Slf4j
 public class Parser {
 
     private static final Set<String> DAY_NAMES = Set.of(
