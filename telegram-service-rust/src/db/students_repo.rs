@@ -1,4 +1,4 @@
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres};
 use log::{info, debug, error};
 use crate::domain::student::Student;
 
@@ -45,15 +45,18 @@ pub async fn find_by_telegram_id(
     }
 }
 
-pub async fn insert(
-    pool: &PgPool,
+pub async fn insert<'a, E>(
+    executor: E,
     telegram_id: i64,
     faculty: &str,
     group_name: &str,
     study_form: &str,
     course: Option<&str>,
     username: Option<&str>,
-) -> anyhow::Result<Student> {
+) -> anyhow::Result<Student>
+where
+    E: sqlx::Executor<'a, Database = Postgres>,
+{
     info!(
         "Регистрация студента: telegram_id={}, faculty={}, group={}, study_form={}, course={:?}, has_username={}",
         mask_telegram_id(telegram_id),
@@ -78,14 +81,14 @@ pub async fn insert(
         RETURNING id, telegram_id, faculty, group_name, study_form, course, username, created_at
         "#,
     )
-    .bind(telegram_id)
-    .bind(faculty)
-    .bind(group_name)
-    .bind(study_form)
-    .bind(course)
-    .bind(username)
-    .fetch_one(pool)
-    .await;
+        .bind(telegram_id)
+        .bind(faculty)
+        .bind(group_name)
+        .bind(study_form)
+        .bind(course)
+        .bind(username)
+        .fetch_one(executor)
+        .await;
 
     match res {
         Ok(student) => {

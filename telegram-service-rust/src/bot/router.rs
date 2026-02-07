@@ -31,24 +31,30 @@ pub async fn run(
     info!("Запуск Telegram-бота...");
 
     let db = Arc::new(db);
-
-    // Внешний API — инфраструктурная зависимость.
-    // Arc нужен по тем же причинам, что и для БД.
     let schedule_api = Arc::new(ScheduleApi::new(schedule_api_base));
 
-    // Роутер апдейтов: сообщения и callback_query.
-    // Логи о том, что Dispatcher запущен, помогут отличить:
-    // "бот упал до роутера" vs "бот запущен, но не отвечает".
     let handler = dptree::entry()
+        // Обработка обычных сообщений
         .branch(Update::filter_message().endpoint({
             let db = Arc::clone(&db);
             let schedule_api = Arc::clone(&schedule_api);
             move |bot: Bot, msg: Message| {
                 let db = Arc::clone(&db);
                 let schedule_api = Arc::clone(&schedule_api);
-                async move { handle_message(bot, msg, db, schedule_api).await }
+                async move {
+                    // Здесь все правильно - handle_message_safe для Message
+                    crate::bot::error_handler::handle_message_safe(
+                        bot.clone(),
+                        msg.clone(),
+                        |b, m| async move {
+                            handle_message(b, m, db, schedule_api).await
+                        },
+                    )
+                        .await
+                }
             }
         }))
+        // Обработка callback (кнопок)
         .branch(Update::filter_callback_query().endpoint({
             let db = Arc::clone(&db);
             let schedule_api = Arc::clone(&schedule_api);
@@ -57,14 +63,22 @@ pub async fn run(
                 let db = Arc::clone(&db);
                 let schedule_api = Arc::clone(&schedule_api);
                 async move {
-                    handle_callback(
-                        bot,
-                        q,
-                        db,
-                        schedule_api,
-                        schedule_tz_offset_seconds,
+                    // ИСПРАВЛЯЕМ: используем handle_callback_safe для CallbackQuery
+                    crate::bot::error_handler::handle_callback_safe(
+                        bot.clone(),
+                        q.clone(),
+                        |b, query| async move {
+                            handle_callback(
+                                b,
+                                query,
+                                db,
+                                schedule_api,
+                                schedule_tz_offset_seconds,
+                            )
+                                .await
+                        },
                     )
-                    .await
+                        .await
                 }
             }
         }));
@@ -76,7 +90,6 @@ pub async fn run(
         .dispatch()
         .await;
 
-    // Если дошли сюда — dispatcher завершился (обычно shutdown).
     warn!("Dispatcher stopped. Bot runtime finished.");
 }
 

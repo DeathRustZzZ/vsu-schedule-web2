@@ -148,7 +148,12 @@ public class ScheduleService {
         if (initials == null) {
             return "";
         }
-        return initials.replaceAll("\\s+", "").trim();
+        String normalized = initials.replaceAll("\\s+", " ").trim();
+        if (normalized.length() > 20) {
+            log.warn("Initials too long ({}), truncating: '{}'", normalized.length(), normalized);
+            normalized = normalized.substring(0, 20);
+        }
+        return normalized;
     }
 
     private String normalizeLastname(String lastname) {

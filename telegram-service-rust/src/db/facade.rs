@@ -1,5 +1,6 @@
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use sqlx::PgPool;
+use anyhow;
 
 use crate::db::{students_repo, user_states_repo};
 use crate::domain::registration_state::RegistrationState;
@@ -42,6 +43,90 @@ impl DbFacade {
         students_repo::find_by_telegram_id(&self.pool, telegram_id).await
     }
 
+    pub async fn complete_registration_atomic(
+        &self,
+        telegram_id: i64,
+        expected_state: RegistrationState,
+        faculty: &str,
+        group_name: &str,
+        study_form: &str,
+        course: Option<&str>,
+        username: Option<&str>,
+    ) -> anyhow::Result<Student> {
+        info!(
+            "DB: atomic registration telegram_id={} expected_state={}",
+            mask_telegram_id(telegram_id),
+            expected_state.as_str()
+        );
+
+        // Начинаем транзакцию
+        let mut tx = self.pool.begin().await?;
+
+        // Читаем состояние с блокировкой
+        let state = sqlx::query_as::<_, UserState>(
+            "SELECT id, telegram_id, state, faculty, study_form, course, ui_chat_id, ui_message_id, reply_message_id, reply_state, created_at, updated_at FROM user_states WHERE telegram_id = $1 FOR UPDATE"
+        )
+            .bind(telegram_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+
+        // Проверяем состояние
+        match state {
+            Some(ref s) if s.state == expected_state.as_str() => {
+                debug!("DB: state is correct, proceeding with registration");
+            }
+            Some(ref s) => {
+                warn!(
+                    "DB: expected state '{}', but found '{}'",
+                    expected_state.as_str(),
+                    s.state
+                );
+                tx.rollback().await?;
+                return Err(anyhow::anyhow!(
+                    "Invalid state: expected '{}', found '{}'",
+                    expected_state.as_str(),
+                    s.state
+                ));
+            }
+            None => {
+                warn!("DB: user_state not found for telegram_id={}", telegram_id);
+                tx.rollback().await?;
+                return Err(anyhow::anyhow!("User state not found"));
+            }
+        }
+
+        // Создаем студента (используем &mut *tx вместо &mut tx)
+        let student = students_repo::insert(
+            &mut *tx,
+            telegram_id,
+            faculty,
+            group_name,
+            study_form,
+            course,
+            username,
+        )
+            .await?;
+
+        // Сбрасываем состояние
+        sqlx::query(
+            "UPDATE user_states SET state = 'idle', faculty = NULL, study_form = NULL, course = NULL, updated_at = NOW() WHERE telegram_id = $1"
+        )
+            .bind(telegram_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // Фиксируем транзакцию
+        tx.commit().await?;
+
+        info!(
+            "DB: atomic registration completed for telegram_id={}",
+            mask_telegram_id(telegram_id)
+        );
+
+        Ok(student)
+    }
+    
+    
     /// Зарегистрировать/сохранить студента.
     ///
     /// Это ключевая точка:

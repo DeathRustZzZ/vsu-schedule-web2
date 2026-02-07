@@ -9,6 +9,7 @@ pub mod keyboards;
 pub mod router;
 pub mod schedule_api;
 pub mod ui;
+pub mod error_handler;
 
 use crate::db::facade::DbFacade;
 use sqlx::PgPool;

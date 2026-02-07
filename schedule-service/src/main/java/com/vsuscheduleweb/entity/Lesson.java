@@ -4,6 +4,7 @@ package com.vsuscheduleweb.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.Accessors;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +15,7 @@ import java.util.UUID;
 @Accessors(chain = true)
 @ToString
 @Entity(name = "lessons")
+@Slf4j
 public class Lesson {
 
     @Id
@@ -48,5 +50,16 @@ public class Lesson {
     private String type;
 
     private String faculty;
+
+    // Переопределяем сеттер для валидации длины аудитории
+    public Lesson setAuditorium(String auditorium) {
+        if (auditorium != null && auditorium.length() > 30) {
+            log.warn("Auditorium too long ({}), truncating: '{}'", auditorium.length(), auditorium);
+            this.auditorium = auditorium.substring(0, 30);
+        } else {
+            this.auditorium = auditorium;
+        }
+        return this;
+    }
 
 }
