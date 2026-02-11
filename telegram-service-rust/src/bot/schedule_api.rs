@@ -202,6 +202,11 @@ pub struct LessonResponse {
     #[serde(rename = "groupId")]
     pub group_id: String,
 
+    pub teacher: Option<TeacherResponse>,
+
+    #[serde(rename = "teacherId")]
+    pub teacher_id: Option<i32>,
+
     #[serde(rename = "subgroupId")]
     pub subgroup_id: Option<String>,
 
@@ -210,4 +215,19 @@ pub struct LessonResponse {
     /// Название поля `type` конфликтует с ключевым словом Rust, поэтому `lesson_type`.
     #[serde(rename = "type")]
     pub lesson_type: Option<String>,
+}
+
+/// Преподаватель, как он приходит из Schedule API.
+#[derive(Debug, Deserialize, Clone)]
+pub struct TeacherResponse {
+    pub id: Option<i32>,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
+    pub surname: Option<String>,
+    pub initials: Option<String>,
+    #[serde(rename = "imgLink")]
+    pub img_link: Option<String>,
+    pub description: Option<String>,
+    pub fullname: Option<String>,
+    pub qualification: Option<String>,
 }

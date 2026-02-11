@@ -4,10 +4,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vsuscheduleweb.DTO.ListLessonResponse;
 import com.vsuscheduleweb.DTO.LessonResponse;
+import com.vsuscheduleweb.DTO.TeacherResponse;
 import com.vsuscheduleweb.entity.Group;
 import com.vsuscheduleweb.entity.Lesson;
 import com.vsuscheduleweb.entity.Subgroup;
 import com.vsuscheduleweb.mapper.LessonMapper;
+import com.vsuscheduleweb.mapper.TeacherMapper;
+import com.vsuscheduleweb.repositories.TeacherRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +32,8 @@ public class BotScheduleCacheService {
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
     private final LessonMapper lessonMapper;
+    private final TeacherRepository teacherRepository;
+    private final TeacherMapper teacherMapper;
 
     @Value("${bot.schedule-cache-ttl:PT30M}")
     private Duration ttl;
@@ -80,6 +85,8 @@ public class BotScheduleCacheService {
 
         evictByFaculty(faculty);
 
+        Map<Integer, TeacherResponse> teacherById = buildTeacherIndex(lessons);
+
         Map<String, List<LessonResponse>> commonByGroupWeekday = new HashMap<>();
         Map<String, List<LessonResponse>> subgroupByWeekday = new HashMap<>();
 
@@ -89,6 +96,12 @@ public class BotScheduleCacheService {
             }
             String weekDay = safe(lesson.getWeekDay());
             LessonResponse response = lessonMapper.entityToResponse(lesson);
+            if (response.getTeacher() == null) {
+                Integer teacherId = response.getTeacherId();
+                if (teacherId != null && teacherId != -1) {
+                    response.setTeacher(teacherById.get(teacherId));
+                }
+            }
 
             String subgroupId = safe(lesson.getSubgroupId());
             String groupId = safe(lesson.getGroupId());
@@ -164,5 +177,29 @@ public class BotScheduleCacheService {
 
     private static String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private Map<Integer, TeacherResponse> buildTeacherIndex(List<Lesson> lessons) {
+        Set<Integer> ids = new HashSet<>();
+        for (Lesson lesson : lessons) {
+            Integer id = lesson.getTeacherId();
+            if (id != null && id != -1) {
+                ids.add(id);
+            }
+        }
+        if (ids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<TeacherResponse> teachers = teacherRepository.findByIdIn(new ArrayList<>(ids))
+                .stream()
+                .map(teacherMapper::entityToResponse)
+                .toList();
+        Map<Integer, TeacherResponse> byId = new HashMap<>();
+        for (TeacherResponse teacher : teachers) {
+            if (teacher.getId() != null) {
+                byId.put(teacher.getId(), teacher);
+            }
+        }
+        return byId;
     }
 }

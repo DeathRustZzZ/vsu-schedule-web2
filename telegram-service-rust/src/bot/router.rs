@@ -1254,10 +1254,54 @@ fn format_schedule_message(
             }
         }
 
+        if let Some(teacher) = lesson.teacher.as_ref() {
+            let name = teacher_display_name(teacher);
+            if !name.is_empty() {
+                line.push_str(" — ");
+                line.push_str(&name);
+            }
+        }
+
         lines.push(line);
     }
 
     format!("{header}\n{}", lines.join("\n"))
+}
+
+fn teacher_display_name(teacher: &crate::bot::schedule_api::TeacherResponse) -> String {
+    if let Some(fullname) = teacher.fullname.as_ref() {
+        let v = fullname.trim();
+        if !v.is_empty() {
+            return v.to_string();
+        }
+    }
+    let mut parts = Vec::new();
+    if let Some(lastname) = teacher.lastname.as_ref() {
+        let v = lastname.trim();
+        if !v.is_empty() {
+            parts.push(v);
+        }
+    }
+    if let Some(initials) = teacher.initials.as_ref() {
+        let v = initials.trim();
+        if !v.is_empty() {
+            parts.push(v);
+        }
+    } else {
+        if let Some(firstname) = teacher.firstname.as_ref() {
+            let v = firstname.trim();
+            if !v.is_empty() {
+                parts.push(v);
+            }
+        }
+        if let Some(surname) = teacher.surname.as_ref() {
+            let v = surname.trim();
+            if !v.is_empty() {
+                parts.push(v);
+            }
+        }
+    }
+    parts.join(" ")
 }
 
 /// Текущий день недели на русском.
