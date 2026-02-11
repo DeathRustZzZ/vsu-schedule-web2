@@ -18,7 +18,7 @@
    docker compose -f compose-env.yaml down
 
    #Удалить также volumes:
-   docker compose -f compose-env.yaml down -v`
+   docker compose -f compose-env.yaml down -v
    docker compose -f compose-env.yaml up -d --build eurekaserver api-gateway schedule-service db students-db redis
    ```
    Это поднимет:

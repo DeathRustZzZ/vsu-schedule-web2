@@ -41,6 +41,12 @@ public class Lesson {
     @Column(name = "teacher_id")
     private Integer teacherId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "teacher_id", insertable = false, updatable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Teacher teacher;
+
     @Column(name = "subgroup_id")
     private String subgroupId;
 

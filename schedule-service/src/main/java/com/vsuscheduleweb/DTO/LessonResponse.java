@@ -19,6 +19,7 @@ public class LessonResponse {
     private String weekDay;
     private String groupId;
     private Integer teacherId;
+    private TeacherResponse teacher;
     private String subgroupId;
     private String name;
     private String type;

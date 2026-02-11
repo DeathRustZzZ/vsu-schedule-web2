@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TeacherMapper {
     private final ModelMapper mapper;
-    private final LessonMapper lessonMapper;
 
     public TeacherResponse entityToResponse(Teacher teacher){
         return mapper.map(teacher, TeacherResponse.class);
