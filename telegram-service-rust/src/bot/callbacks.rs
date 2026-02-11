@@ -120,7 +120,7 @@ pub enum Callback {
     Course(Course),
     MitGroup(MitGroup),
     GroupId(String),
-    SubgroupId(String),
+    SubgroupChoice { group_id: String, subgroup_id: String },
 }
 
 impl FromStr for Callback {
@@ -156,7 +156,16 @@ impl FromStr for Callback {
             return Ok(Callback::GroupId(rest.to_string()));
         }
         if let Some(rest) = s.strip_prefix("subgroup:") {
-            return Ok(Callback::SubgroupId(rest.to_string()));
+            if let Some((group_id, subgroup_id)) = rest.split_once('|') {
+                return Ok(Callback::SubgroupChoice {
+                    group_id: group_id.to_string(),
+                    subgroup_id: subgroup_id.to_string(),
+                });
+            }
+            return Ok(Callback::SubgroupChoice {
+                group_id: String::new(),
+                subgroup_id: rest.to_string(),
+            });
         }
         if let Ok(group) = MitGroup::from_str(s) {
             return Ok(Callback::MitGroup(group));

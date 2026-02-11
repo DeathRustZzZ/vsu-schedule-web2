@@ -13,7 +13,7 @@ pub async fn find_by_telegram_id(
 
     let row = sqlx::query_as::<_, Student>(
         r#"
-        SELECT id, telegram_id, faculty, group_name, study_form, course, username, created_at
+        SELECT id, telegram_id, faculty, group_name, subgroup_name, study_form, course, username, created_at
         FROM students
         WHERE telegram_id = $1
         "#,
@@ -50,6 +50,7 @@ pub async fn insert<'a, E>(
     telegram_id: i64,
     faculty: &str,
     group_name: &str,
+    subgroup_name: Option<&str>,
     study_form: &str,
     course: Option<&str>,
     username: Option<&str>,
@@ -69,21 +70,23 @@ where
 
     let res = sqlx::query_as::<_, Student>(
         r#"
-        INSERT INTO students (telegram_id, faculty, group_name, study_form, course, username)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO students (telegram_id, faculty, group_name, subgroup_name, study_form, course, username)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (telegram_id)
         DO UPDATE SET
             faculty = EXCLUDED.faculty,
             group_name = EXCLUDED.group_name,
+            subgroup_name = EXCLUDED.subgroup_name,
             study_form = EXCLUDED.study_form,
             course = EXCLUDED.course,
             username = EXCLUDED.username
-        RETURNING id, telegram_id, faculty, group_name, study_form, course, username, created_at
+        RETURNING id, telegram_id, faculty, group_name, subgroup_name, study_form, course, username, created_at
         "#,
     )
         .bind(telegram_id)
         .bind(faculty)
         .bind(group_name)
+        .bind(subgroup_name)
         .bind(study_form)
         .bind(course)
         .bind(username)

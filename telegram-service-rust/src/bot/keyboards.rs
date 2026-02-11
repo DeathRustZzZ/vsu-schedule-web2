@@ -180,12 +180,12 @@ pub fn groups_keyboard(groups: &[GroupWithSubgroupsIds]) -> InlineKeyboardMarkup
 }
 
 /// Клавиатура выбора подгруппы.
-pub fn subgroups_keyboard(subgroups: &[String]) -> InlineKeyboardMarkup {
+pub fn subgroups_keyboard(group_id: &str, subgroups: &[String]) -> InlineKeyboardMarkup {
     let mut rows = Vec::new();
     for subgroup in subgroups {
         rows.push(vec![InlineKeyboardButton::callback(
             subgroup.clone(),
-            format!("subgroup:{}", subgroup),
+            format!("subgroup:{}|{}", group_id, subgroup),
         )]);
     }
     InlineKeyboardMarkup::new(rows)

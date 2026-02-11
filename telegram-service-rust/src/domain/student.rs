@@ -9,6 +9,7 @@ pub struct Student {
     pub telegram_id: i64,
     pub faculty: String,
     pub group_name: String,
+    pub subgroup_name: Option<String>,
     pub study_form: String,
     pub course: Option<String>,
     pub username: Option<String>,

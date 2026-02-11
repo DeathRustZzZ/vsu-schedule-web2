@@ -147,8 +147,8 @@ pub async fn update_ui_message(
     );
 
     let updated = sqlx::query_as::<_, UserState>(
-        "INSERT INTO user_states (telegram_id, state, ui_chat_id, ui_message_id)
-         VALUES ($1, 'idle', $2, $3)
+        "INSERT INTO user_states (telegram_id, ui_chat_id, ui_message_id)
+         VALUES ($1, $2, $3)
          ON CONFLICT (telegram_id)
          DO UPDATE SET ui_chat_id = EXCLUDED.ui_chat_id, ui_message_id = EXCLUDED.ui_message_id, updated_at = NOW()
          RETURNING id, telegram_id, state, faculty, study_form, course, ui_chat_id, ui_message_id, reply_message_id, reply_state, created_at, updated_at",
