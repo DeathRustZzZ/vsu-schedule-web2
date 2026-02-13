@@ -1,0 +1,2 @@
+ALTER TABLE students
+    ADD COLUMN IF NOT EXISTS subgroup_name VARCHAR;

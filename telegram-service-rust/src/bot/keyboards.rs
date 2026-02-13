@@ -2,7 +2,9 @@ use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
 use crate::bot::callbacks::Action;
 use crate::bot::schedule_api::GroupWithSubgroupsIds;
-use crate::domain::{course::Course, faculty::Faculty, groups::mit::MitGroup, study_form::StudyForm};
+use crate::domain::{
+    course::Course, faculty::Faculty, groups::mit::MitGroup, study_form::StudyForm,
+};
 
 /// Главное меню бота.
 ///
@@ -39,10 +41,7 @@ pub fn main_menu(is_registered: bool) -> InlineKeyboardMarkup {
                     Action::ChooseGroup.title(),
                     Action::ChooseGroup.callback(),
                 ),
-                InlineKeyboardButton::callback(
-                    Action::Help.title(),
-                    Action::Help.callback(),
-                ),
+                InlineKeyboardButton::callback(Action::Help.title(), Action::Help.callback()),
             ],
         ])
     } else {
@@ -124,12 +123,7 @@ pub fn study_form_keyboard() -> InlineKeyboardMarkup {
 pub fn course_keyboard() -> InlineKeyboardMarkup {
     log::debug!("building course selection keyboard");
 
-    let courses = [
-        Course::First,
-        Course::Second,
-        Course::Third,
-        Course::Fourth,
-    ];
+    let courses = [Course::First, Course::Second, Course::Third, Course::Fourth];
 
     InlineKeyboardMarkup::new(
         courses
@@ -189,4 +183,70 @@ pub fn subgroups_keyboard(group_id: &str, subgroups: &[String]) -> InlineKeyboar
         )]);
     }
     InlineKeyboardMarkup::new(rows)
+}
+
+/// Клавиатура выбора даты/недели для расписания.
+pub fn schedule_menu_keyboard(
+    today: &str,
+    tomorrow: &str,
+    week_start: &str,
+    week_end: &str,
+    next_week_start: &str,
+    next_week_end: &str,
+) -> InlineKeyboardMarkup {
+    InlineKeyboardMarkup::new(vec![
+        vec![
+            InlineKeyboardButton::callback("Сегодня", format!("schedule:date:{today}")),
+            InlineKeyboardButton::callback("Завтра", format!("schedule:date:{tomorrow}")),
+        ],
+        vec![
+            InlineKeyboardButton::callback(
+                "Эта неделя",
+                format!("schedule:week:{week_start}|{week_end}"),
+            ),
+            InlineKeyboardButton::callback(
+                "Следующая неделя",
+                format!("schedule:week:{next_week_start}|{next_week_end}"),
+            ),
+        ],
+        vec![InlineKeyboardButton::callback(
+            "Выбрать дату",
+            format!("schedule:picker:{today}"),
+        )],
+        vec![InlineKeyboardButton::callback(
+            Action::Back.title(),
+            Action::Back.callback(),
+        )],
+    ])
+}
+
+/// Клавиатура выбора конкретной даты (список ближайших дней).
+pub fn schedule_date_picker_keyboard(dates: &[(String, String)]) -> InlineKeyboardMarkup {
+    let mut rows = Vec::new();
+
+    for chunk in dates.chunks(2) {
+        let mut row = Vec::new();
+        for (label, value) in chunk {
+            row.push(InlineKeyboardButton::callback(
+                label.clone(),
+                format!("schedule:date:{value}"),
+            ));
+        }
+        rows.push(row);
+    }
+
+    rows.push(vec![InlineKeyboardButton::callback(
+        "◀️ Назад",
+        "schedule:menu",
+    )]);
+
+    InlineKeyboardMarkup::new(rows)
+}
+
+/// Кнопка возврата к меню расписания.
+pub fn schedule_back_menu() -> InlineKeyboardMarkup {
+    InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
+        "◀️ Назад",
+        "schedule:menu",
+    )]])
 }

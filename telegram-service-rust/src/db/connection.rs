@@ -1,8 +1,8 @@
 // src/db/connection.rs
 
 use log::{error, info};
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 
 /// Инициализация пула соединений PostgreSQL.
 ///

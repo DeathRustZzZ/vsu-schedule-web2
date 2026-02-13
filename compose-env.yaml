@@ -51,6 +51,21 @@ services:
       redis:
         condition: service_started
 
+  schedule-service-rust:
+    image: schedule-service-rust:latest
+    build:
+      context: ./schedule-service-rust
+    ports:
+      - '9900:9900'
+    networks:
+      - vsu-schedule-network
+    environment:
+      - DATABASE_URL=postgresql://admin:admin@db:5432/schedule-db
+      - BIND_ADDR=0.0.0.0:9900
+    depends_on:
+      db:
+        condition: service_healthy
+
   telegram-service-rust:
     image: telegram-service-rust:latest
     build:

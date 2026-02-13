@@ -36,5 +36,4 @@ impl UserState {
     pub fn course(&self) -> Option<&str> {
         self.course.as_deref()
     }
-
 }

@@ -32,6 +32,11 @@ spring:
           predicates:
             - Path=/api/v1/bot/**
 
+        - id: bot-schedule-rust
+          uri: http://schedule-service-rust:9900
+          predicates:
+            - Path=/api/v1/bot/v2/**
+
         - id: getAvailableGroupsIdsByFaculty
           uri: lb://schedule-service
           predicates:

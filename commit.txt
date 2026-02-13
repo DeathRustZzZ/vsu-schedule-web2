@@ -19,7 +19,7 @@
 Примеры:
     refactor: simplify handler logic
     refactor: remove redundant code
-    refactor: extract helper module
+    refactor: extract helper moduleда
     refactor: reduce nesting in match
     refactor: replace loops with iterators
     refactor(db): extract repository layer

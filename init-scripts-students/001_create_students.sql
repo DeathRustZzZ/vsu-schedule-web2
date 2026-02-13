@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS students (
     telegram_id BIGINT UNIQUE NOT NULL,
     faculty VARCHAR NOT NULL,
     group_name VARCHAR NOT NULL,
+    subgroup_name VARCHAR,
     study_form VARCHAR NOT NULL,
     course VARCHAR,
     username VARCHAR,

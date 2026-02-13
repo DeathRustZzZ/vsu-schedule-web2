@@ -49,12 +49,14 @@ pub async fn render_screen(
     if let Some(msg_id) = preferred_message_id {
         debug!(
             "render_screen: trying preferred edit (chat_id={} msg_id={})",
-            chat_id.0,
-            msg_id.0
+            chat_id.0, msg_id.0
         );
 
         if try_edit(bot, chat_id, msg_id, text, markup.clone()).await {
-            debug!("render_screen: preferred edit succeeded (msg_id={})", msg_id.0);
+            debug!(
+                "render_screen: preferred edit succeeded (msg_id={})",
+                msg_id.0
+            );
 
             // Сохраняем UI-message в БД, чтобы в будущем можно было редактировать его без preferred id.
             //
@@ -109,8 +111,7 @@ pub async fn render_screen(
             // Это не ошибка: пользователь мог начать диалог в другом чате (личка/группа).
             debug!(
                 "render_screen: ui_message chat mismatch (db_chat_id={}, current_chat_id={})",
-                ui_chat_id,
-                chat_id.0
+                ui_chat_id, chat_id.0
             );
         }
     } else {
@@ -138,8 +139,7 @@ pub async fn render_screen(
 
     debug!(
         "render_screen: message sent (chat_id={} msg_id={})",
-        chat_id.0,
-        sent.id.0
+        chat_id.0, sent.id.0
     );
 
     let _ = db
@@ -192,9 +192,7 @@ async fn try_edit(
             // - bot was blocked by user
             warn!(
                 "try_edit: failed to edit message {} in chat {}: {:?}",
-                message_id.0,
-                chat_id.0,
-                err
+                message_id.0, chat_id.0, err
             );
             false
         }

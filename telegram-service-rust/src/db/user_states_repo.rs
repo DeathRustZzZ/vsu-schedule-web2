@@ -1,6 +1,6 @@
-use sqlx::PgPool;
 use crate::domain::user_state::UserState;
 use log::debug;
+use sqlx::PgPool;
 
 pub async fn find_by_telegram_id(
     pool: &PgPool,
@@ -24,7 +24,10 @@ pub async fn upsert_state(
     telegram_id: i64,
     state: &str,
 ) -> anyhow::Result<UserState> {
-    debug!("Обновление состояния пользователя telegram_id={} на {}", telegram_id, state);
+    debug!(
+        "Обновление состояния пользователя telegram_id={} на {}",
+        telegram_id, state
+    );
 
     let updated = sqlx::query_as::<_, UserState>(
         "INSERT INTO user_states (telegram_id, state)
@@ -46,7 +49,10 @@ pub async fn clear_registration(
     telegram_id: i64,
     state: &str,
 ) -> anyhow::Result<UserState> {
-    debug!("Очистка регистрации пользователя telegram_id={}", telegram_id);
+    debug!(
+        "Очистка регистрации пользователя telegram_id={}",
+        telegram_id
+    );
 
     let updated = sqlx::query_as::<_, UserState>(
         "INSERT INTO user_states (telegram_id, state, faculty, study_form, course)
@@ -69,7 +75,10 @@ pub async fn update_faculty(
     faculty: &str,
     state: &str,
 ) -> anyhow::Result<UserState> {
-    debug!("Обновление факультета пользователя telegram_id={}", telegram_id);
+    debug!(
+        "Обновление факультета пользователя telegram_id={}",
+        telegram_id
+    );
 
     let updated = sqlx::query_as::<_, UserState>(
         "INSERT INTO user_states (telegram_id, state, faculty)
@@ -93,7 +102,10 @@ pub async fn update_study_form(
     study_form: &str,
     state: &str,
 ) -> anyhow::Result<UserState> {
-    debug!("Обновление формы обучения пользователя telegram_id={}", telegram_id);
+    debug!(
+        "Обновление формы обучения пользователя telegram_id={}",
+        telegram_id
+    );
 
     let updated = sqlx::query_as::<_, UserState>(
         "INSERT INTO user_states (telegram_id, state, study_form)

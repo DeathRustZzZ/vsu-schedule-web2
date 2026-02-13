@@ -91,21 +91,25 @@ impl ScheduleApi {
     /// Получить расписание по параметрам.
     ///
     /// Здесь особенно часто происходят проблемы из-за некорректных query-параметров
-    /// (пустые строки, неправильные значения weekday/subgroup и т.д.)
-    pub async fn get_schedule(
+    /// (пустые строки, неправильные значения date/subgroup и т.д.)
+    pub async fn get_schedule_by_date(
         &self,
         faculty: &str,
         group: &str,
         subgroup: &str,
-        weekday: &str,
+        date: &str,
     ) -> Result<ScheduleResponse, reqwest::Error> {
-        let url = format!("{}/api/v1/bot/schedule", self.base_url);
+        let url = format!("{}/api/v1/bot/v2/schedule", self.base_url);
 
         // Debug: логируем все параметры запроса.
         // Это must-have для расследования "почему пользователю показывается не то расписание".
         log::debug!(
-            "ScheduleApi.get_schedule request: url='{}' faculty='{}' group='{}' subgroup='{}' weekday='{}'",
-            url, faculty, group, subgroup, weekday
+            "ScheduleApi.get_schedule_by_date request: url='{}' faculty='{}' group='{}' subgroup='{}' date='{}'",
+            url,
+            faculty,
+            group,
+            subgroup,
+            date
         );
 
         let response = self
@@ -115,7 +119,7 @@ impl ScheduleApi {
                 ("faculty", faculty),
                 ("group", group),
                 ("subgroup", subgroup),
-                ("weekday", weekday),
+                ("date", date),
             ])
             .send()
             .await?;
@@ -130,12 +134,67 @@ impl ScheduleApi {
         // "API упало" от "у нас баг в десериализации" и от "параметры неправильные".
         if response.status().is_client_error() || response.status().is_server_error() {
             log::warn!(
-                "ScheduleApi.get_schedule http error: status={} (faculty='{}', group='{}', subgroup='{}', weekday='{}')",
+                "ScheduleApi.get_schedule_by_date http error: status={} (faculty='{}', group='{}', subgroup='{}', date='{}')",
                 response.status(),
                 faculty,
                 group,
                 subgroup,
-                weekday
+                date
+            );
+        }
+
+        response.error_for_status()?.json().await
+    }
+
+    /// Получить расписание за неделю (диапазон дат).
+    pub async fn get_schedule_week(
+        &self,
+        faculty: &str,
+        group: &str,
+        subgroup: &str,
+        start: &str,
+        end: Option<&str>,
+    ) -> Result<ScheduleResponse, reqwest::Error> {
+        let url = format!("{}/api/v1/bot/v2/schedule/week", self.base_url);
+
+        log::debug!(
+            "ScheduleApi.get_schedule_week request: url='{}' faculty='{}' group='{}' subgroup='{}' start='{}' end='{:?}'",
+            url,
+            faculty,
+            group,
+            subgroup,
+            start,
+            end
+        );
+
+        let mut req = self.client.get(url).query(&[
+            ("faculty", faculty),
+            ("group", group),
+            ("subgroup", subgroup),
+            ("start", start),
+        ]);
+
+        if let Some(end) = end {
+            req = req.query(&[("end", end)]);
+        }
+
+        let response = req.send().await?;
+
+        log::debug!(
+            "ScheduleApi.get_schedule_week response: status={} final_url='{}'",
+            response.status(),
+            response.url()
+        );
+
+        if response.status().is_client_error() || response.status().is_server_error() {
+            log::warn!(
+                "ScheduleApi.get_schedule_week http error: status={} (faculty='{}', group='{}', subgroup='{}', start='{}', end='{:?}')",
+                response.status(),
+                faculty,
+                group,
+                subgroup,
+                start,
+                end
             );
         }
 
@@ -184,23 +243,23 @@ pub struct LessonResponse {
     pub id: String,
 
     #[serde(rename = "startTime")]
-    pub start_time: String,
+    pub start_time: Option<String>,
 
     #[serde(rename = "endTime")]
-    pub end_time: String,
+    pub end_time: Option<String>,
 
     /// Аудитория может отсутствовать (онлайн/уточняется/не задано).
     pub auditorium: Option<String>,
 
     /// Дата занятия строкой (формат зависит от API).
     /// Если понадобится строгая работа с датой, это обычно конвертят на уровне domain.
-    pub date: String,
+    pub date: Option<String>,
 
     #[serde(rename = "weekDay")]
-    pub week_day: String,
+    pub week_day: Option<String>,
 
     #[serde(rename = "groupId")]
-    pub group_id: String,
+    pub group_id: Option<String>,
 
     pub teacher: Option<TeacherResponse>,
 
@@ -210,7 +269,7 @@ pub struct LessonResponse {
     #[serde(rename = "subgroupId")]
     pub subgroup_id: Option<String>,
 
-    pub name: String,
+    pub name: Option<String>,
 
     /// Название поля `type` конфликтует с ключевым словом Rust, поэтому `lesson_type`.
     #[serde(rename = "type")]

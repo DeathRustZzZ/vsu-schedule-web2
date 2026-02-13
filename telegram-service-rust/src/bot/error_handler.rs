@@ -4,11 +4,7 @@ use log::{error, warn};
 use teloxide::prelude::*;
 
 /// Обертка для безопасной обработки сообщений
-pub async fn handle_message_safe<F, Fut>(
-    bot: Bot,
-    msg: Message,
-    handler: F,
-) -> ResponseResult<()>
+pub async fn handle_message_safe<F, Fut>(bot: Bot, msg: Message, handler: F) -> ResponseResult<()>
 where
     F: FnOnce(Bot, Message) -> Fut,
     Fut: std::future::Future<Output = ResponseResult<()>>,
@@ -53,11 +49,7 @@ where
     match handler(bot.clone(), q.clone()).await {
         Ok(_) => Ok(()),
         Err(e) => {
-            error!(
-                "Error handling callback from user {}: {:?}",
-                q.from.id.0,
-                e
-            );
+            error!("Error handling callback from user {}: {:?}", q.from.id.0, e);
 
             // Убираем "часики" на кнопке
             // ИСПРАВЛЕНО: убрали & перед q.id

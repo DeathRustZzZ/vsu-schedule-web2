@@ -39,4 +39,12 @@ public interface LessonRepository extends JpaRepository<Lesson, UUID> {
             @Param("subgroupId") String subgroupId,
             @Param("weekDay") String weekDay
     );
+
+    @Query("SELECT l FROM lessons l WHERE l.faculty = :faculty AND (l.groupId = :groupId OR l.subgroupId = :subgroupId)")
+    @EntityGraph(attributePaths = "teacher")
+    List<Lesson> findByFacultyAndGroupOrSubgroup(
+            @Param("faculty") String faculty,
+            @Param("groupId") String groupId,
+            @Param("subgroupId") String subgroupId
+    );
 }

@@ -1,35 +1,320 @@
-use chrono::{Datelike, FixedOffset, Utc};
+use chrono::{Datelike, Duration, FixedOffset, NaiveDate, Utc};
 use log::{debug, info, warn};
 use teloxide::prelude::*;
 use teloxide::types::MessageId;
 
 use crate::bot::keyboards;
-use crate::bot::schedule_api::{GroupWithSubgroupsIds, LessonResponse, ScheduleApi, TeacherResponse};
+use crate::bot::schedule_api::{
+    GroupWithSubgroupsIds, LessonResponse, ScheduleApi, TeacherResponse,
+};
 use crate::bot::ui::render_screen;
 use crate::db::facade::DbFacade;
 
-/// Показ расписания через внешний Schedule API.
-///
-/// Здесь самые важные зоны для логов:
-/// - входные параметры (факультет/группа/weekday)
-/// - этапы: загрузили профиль → загрузили список групп → подобрали id → загрузили расписание
-/// - ошибки API (они не фатальные, но должны быть видимыми)
-pub async fn show_schedule(
+pub struct ScheduleFlowContext<'a> {
+    pub bot: &'a Bot,
+    pub db: &'a DbFacade,
+    pub schedule_api: &'a ScheduleApi,
+    pub schedule_tz_offset_seconds: i32,
+    pub telegram_id: i64,
+    pub chat_id: ChatId,
+    pub message_id: Option<MessageId>,
+}
+
+impl<'a> ScheduleFlowContext<'a> {
+    pub fn new(
+        bot: &'a Bot,
+        db: &'a DbFacade,
+        schedule_api: &'a ScheduleApi,
+        schedule_tz_offset_seconds: i32,
+        telegram_id: i64,
+        chat_id: ChatId,
+        message_id: Option<MessageId>,
+    ) -> Self {
+        Self {
+            bot,
+            db,
+            schedule_api,
+            schedule_tz_offset_seconds,
+            telegram_id,
+            chat_id,
+            message_id,
+        }
+    }
+}
+
+/// Показ меню выбора даты/недели для расписания.
+pub async fn show_schedule_menu(
     bot: &Bot,
     db: &DbFacade,
-    schedule_api: &ScheduleApi,
     schedule_tz_offset_seconds: i32,
     telegram_id: i64,
     chat_id: ChatId,
     message_id: Option<MessageId>,
 ) -> Result<(), teloxide::RequestError> {
-    info!("show_schedule requested: user={} chat_id={}", telegram_id, chat_id.0);
+    debug!(
+        "show_schedule_menu requested: user={} chat_id={}",
+        telegram_id, chat_id.0
+    );
+
+    let is_registered = db.find_student(telegram_id).await.ok().flatten().is_some();
+    if !is_registered {
+        return render_screen(
+            bot,
+            db,
+            telegram_id,
+            chat_id,
+            message_id,
+            "Сначала зарегистрируйся, чтобы смотреть расписание.",
+            Some(keyboards::back_menu()),
+        )
+        .await;
+    }
+
+    let menu = schedule_menu_keyboard_for_now(schedule_tz_offset_seconds);
+    render_screen(
+        bot,
+        db,
+        telegram_id,
+        chat_id,
+        message_id,
+        "Выбери дату или неделю:",
+        Some(menu),
+    )
+    .await
+}
+
+/// Показ выбора даты (список ближайших дней).
+pub async fn show_date_picker(
+    bot: &Bot,
+    db: &DbFacade,
+    schedule_tz_offset_seconds: i32,
+    telegram_id: i64,
+    chat_id: ChatId,
+    message_id: Option<MessageId>,
+    start_date: Option<NaiveDate>,
+) -> Result<(), teloxide::RequestError> {
+    debug!(
+        "show_date_picker requested: user={} chat_id={} start_date={:?}",
+        telegram_id, chat_id.0, start_date
+    );
+
+    let is_registered = db.find_student(telegram_id).await.ok().flatten().is_some();
+    if !is_registered {
+        return render_screen(
+            bot,
+            db,
+            telegram_id,
+            chat_id,
+            message_id,
+            "Сначала зарегистрируйся, чтобы смотреть расписание.",
+            Some(keyboards::back_menu()),
+        )
+        .await;
+    }
+
+    let base = start_date.unwrap_or_else(|| current_date(schedule_tz_offset_seconds));
+    let mut dates = Vec::new();
+    for offset in 0..14 {
+        let date = base + Duration::days(offset);
+        let label = format!(
+            "{} {}",
+            weekday_ru_short(date.weekday()),
+            format_display_date_short(date)
+        );
+        let value = format_api_date(date);
+        dates.push((label, value));
+    }
+
+    let keyboard = keyboards::schedule_date_picker_keyboard(&dates);
+    render_screen(
+        bot,
+        db,
+        telegram_id,
+        chat_id,
+        message_id,
+        "Выбери дату:",
+        Some(keyboard),
+    )
+    .await
+}
+
+/// Показ расписания на конкретную дату.
+pub async fn show_schedule_for_date(
+    ctx: ScheduleFlowContext<'_>,
+    date: NaiveDate,
+) -> Result<(), teloxide::RequestError> {
+    let ScheduleFlowContext {
+        bot,
+        db,
+        schedule_api,
+        schedule_tz_offset_seconds,
+        telegram_id,
+        chat_id,
+        message_id,
+    } = ctx;
+
+    info!(
+        "show_schedule_for_date requested: user={} chat_id={} date={}",
+        telegram_id, chat_id.0, date
+    );
+
+    let context = match resolve_schedule_context(&ctx).await? {
+        Some(context) => context,
+        None => return Ok(()),
+    };
+
+    let date_str = format_api_date(date);
+    let schedule = match schedule_api
+        .get_schedule_by_date(
+            &context.faculty,
+            &context.group_id,
+            &context.subgroup_id,
+            &date_str,
+        )
+        .await
+    {
+        Ok(schedule) => {
+            debug!("schedule loaded: lessons_count={}", schedule.lessons.len());
+            schedule
+        }
+        Err(err) => {
+            warn!("Failed to load schedule by date: {:?}", err);
+            return render_screen(
+                bot,
+                db,
+                telegram_id,
+                chat_id,
+                message_id,
+                "❌ Не удалось получить расписание.",
+                Some(keyboards::schedule_back_menu()),
+            )
+            .await;
+        }
+    };
+
+    let text = format_schedule_message_for_date(
+        &context.group_id,
+        &context.subgroup_id,
+        schedule.lessons,
+        date,
+    );
+
+    render_screen(
+        bot,
+        db,
+        telegram_id,
+        chat_id,
+        message_id,
+        &text,
+        Some(schedule_menu_keyboard_for_now(schedule_tz_offset_seconds)),
+    )
+    .await
+}
+
+/// Показ расписания за неделю (диапазон дат).
+pub async fn show_schedule_for_week(
+    ctx: ScheduleFlowContext<'_>,
+    start: NaiveDate,
+    end: NaiveDate,
+) -> Result<(), teloxide::RequestError> {
+    let ScheduleFlowContext {
+        bot,
+        db,
+        schedule_api,
+        schedule_tz_offset_seconds,
+        telegram_id,
+        chat_id,
+        message_id,
+    } = ctx;
+
+    info!(
+        "show_schedule_for_week requested: user={} chat_id={} start={} end={}",
+        telegram_id, chat_id.0, start, end
+    );
+
+    let context = match resolve_schedule_context(&ctx).await? {
+        Some(context) => context,
+        None => return Ok(()),
+    };
+
+    let start_str = format_api_date(start);
+    let end_str = format_api_date(end);
+    let schedule = match schedule_api
+        .get_schedule_week(
+            &context.faculty,
+            &context.group_id,
+            &context.subgroup_id,
+            &start_str,
+            Some(&end_str),
+        )
+        .await
+    {
+        Ok(schedule) => {
+            debug!(
+                "week schedule loaded: lessons_count={}",
+                schedule.lessons.len()
+            );
+            schedule
+        }
+        Err(err) => {
+            warn!("Failed to load week schedule: {:?}", err);
+            return render_screen(
+                bot,
+                db,
+                telegram_id,
+                chat_id,
+                message_id,
+                "❌ Не удалось получить расписание недели.",
+                Some(keyboards::schedule_back_menu()),
+            )
+            .await;
+        }
+    };
+
+    let text = format_schedule_message_for_week(
+        &context.group_id,
+        &context.subgroup_id,
+        schedule.lessons,
+        start,
+        end,
+    );
+
+    render_screen(
+        bot,
+        db,
+        telegram_id,
+        chat_id,
+        message_id,
+        &text,
+        Some(schedule_menu_keyboard_for_now(schedule_tz_offset_seconds)),
+    )
+    .await
+}
+
+struct ScheduleContext {
+    faculty: String,
+    group_id: String,
+    subgroup_id: String,
+}
+
+async fn resolve_schedule_context(
+    ctx: &ScheduleFlowContext<'_>,
+) -> Result<Option<ScheduleContext>, teloxide::RequestError> {
+    let ScheduleFlowContext {
+        bot,
+        db,
+        schedule_api,
+        telegram_id,
+        chat_id,
+        message_id,
+        ..
+    } = *ctx;
 
     let student = match db.find_student(telegram_id).await {
         Ok(Some(student)) => student,
         Ok(None) => {
             info!("user {} requested schedule but not registered", telegram_id);
-            return render_screen(
+            render_screen(
                 bot,
                 db,
                 telegram_id,
@@ -38,11 +323,15 @@ pub async fn show_schedule(
                 "Сначала зарегистрируйся, чтобы смотреть расписание.",
                 Some(keyboards::back_menu()),
             )
-            .await;
+            .await?;
+            return Ok(None);
         }
         Err(err) => {
-            warn!("failed to load student profile for user {}: {:?}", telegram_id, err);
-            return render_screen(
+            warn!(
+                "failed to load student profile for user {}: {:?}",
+                telegram_id, err
+            );
+            render_screen(
                 bot,
                 db,
                 telegram_id,
@@ -51,25 +340,23 @@ pub async fn show_schedule(
                 "❌ Не удалось загрузить профиль.",
                 Some(keyboards::back_menu()),
             )
-            .await;
+            .await?;
+            return Ok(None);
         }
     };
 
-    // Приводим факультет из профиля к ожидаемому формату внешнего API.
-    // Это "тонкое место": разные источники могут писать "ФМиИТ" по-разному.
     let faculty = normalize_faculty(&student.faculty);
     debug!(
         "faculty normalization: raw='{}' normalized={:?}",
         student.faculty, faculty
     );
 
-    // Пока поддерживаем только ФМиИТ — явно сообщаем пользователю и логируем.
-    if faculty.as_deref() != Some("ФМиИТ") {
+    if faculty != Some("ФМиИТ") {
         info!(
             "schedule requested for unsupported faculty: raw='{}' user={}",
             student.faculty, telegram_id
         );
-        return render_screen(
+        render_screen(
             bot,
             db,
             telegram_id,
@@ -78,25 +365,12 @@ pub async fn show_schedule(
             "Пока поддерживается только факультет ФМиИТ.",
             Some(keyboards::back_menu()),
         )
-        .await;
+        .await?;
+        return Ok(None);
     }
 
-    // Текущий день недели: используется как параметр API.
-    // Логируем, чтобы понимать, что именно запрашивали у API.
-    let weekday = current_weekday_ru(schedule_tz_offset_seconds);
-    debug!(
-        "schedule request context: user={} faculty={:?} group_name='{}' subgroup='{}' weekday='{}'",
-        telegram_id,
-        faculty,
-        student.group_name,
-        student.subgroup_name.as_deref().unwrap_or(""),
-        weekday
-    );
-
-    // 1) Получаем список доступных групп.
-    // Это нужно, чтобы подобрать (group_id, subgroup_id) под student.group_name.
     let available = match schedule_api
-        .get_available_groups(faculty.as_deref().unwrap_or(&student.faculty))
+        .get_available_groups(faculty.unwrap_or(&student.faculty))
         .await
     {
         Ok(list) => {
@@ -105,7 +379,7 @@ pub async fn show_schedule(
         }
         Err(err) => {
             warn!("Failed to load groups list: {:?}", err);
-            return render_screen(
+            render_screen(
                 bot,
                 db,
                 telegram_id,
@@ -114,11 +388,11 @@ pub async fn show_schedule(
                 "❌ Не удалось получить список групп.",
                 Some(keyboards::back_menu()),
             )
-            .await;
+            .await?;
+            return Ok(None);
         }
     };
 
-    // 2) Подбираем group_id / subgroup_id из списка.
     let (group_id, subgroup_id) = match pick_group_and_subgroup_with_preference(
         &available,
         &student.group_name,
@@ -138,7 +412,7 @@ pub async fn show_schedule(
                 student.subgroup_name.as_deref().unwrap_or(""),
                 available.len()
             );
-            return render_screen(
+            render_screen(
                 bot,
                 db,
                 telegram_id,
@@ -147,160 +421,61 @@ pub async fn show_schedule(
                 "❌ Не удалось подобрать группу. Обратись к администратору.",
                 Some(keyboards::back_menu()),
             )
-            .await;
+            .await?;
+            return Ok(None);
         }
     };
 
-    // 3) Загружаем расписание.
-    let schedule = match schedule_api
-        .get_schedule(
-            faculty.as_deref().unwrap_or(&student.faculty),
-            &group_id,
-            &subgroup_id,
-            weekday,
-        )
-        .await
-    {
-        Ok(schedule) => {
-            debug!("schedule loaded: lessons_count={}", schedule.lessons.len());
-            schedule
-        }
-        Err(err) => {
-            warn!("Failed to load schedule: {:?}", err);
-            return render_screen(
-                bot,
-                db,
-                telegram_id,
-                chat_id,
-                message_id,
-                "❌ Не удалось получить расписание.",
-                Some(keyboards::back_menu()),
-            )
-            .await;
-        }
-    };
-
-    // 4) Формируем сообщение пользователю.
-    // На этом этапе часто возникают "визуальные" баги, поэтому полезно логировать
-    // количество занятий и выбранные id.
-    debug!(
-        "formatting schedule message: group_id='{}' subgroup_id='{}' lessons_count={}",
+    Ok(Some(ScheduleContext {
+        faculty: faculty
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| student.faculty.clone()),
         group_id,
         subgroup_id,
-        schedule.lessons.len()
-    );
+    }))
+}
 
-    let text = format_schedule_message(&group_id, &subgroup_id, schedule.lessons, weekday);
+fn schedule_menu_keyboard_for_now(offset_seconds: i32) -> teloxide::types::InlineKeyboardMarkup {
+    let today = current_date(offset_seconds);
+    let tomorrow = today + Duration::days(1);
+    let week_start = week_start_date(today);
+    let week_end = week_start + Duration::days(6);
+    let next_week_start = week_start + Duration::days(7);
+    let next_week_end = next_week_start + Duration::days(6);
 
-    render_screen(
-        bot,
-        db,
-        telegram_id,
-        chat_id,
-        message_id,
-        &text,
-        Some(keyboards::back_menu()),
+    keyboards::schedule_menu_keyboard(
+        &format_api_date(today),
+        &format_api_date(tomorrow),
+        &format_api_date(week_start),
+        &format_api_date(week_end),
+        &format_api_date(next_week_start),
+        &format_api_date(next_week_end),
     )
-    .await
 }
 
-/// Подбор пары (group_id, subgroup_id) на основании:
-/// - списка доступных групп от внешнего API
-/// - `group_name`, который хранится у студента
-///
-/// Важный момент:
-/// подбор идёт по `contains` на lower-case строках → это эвристика.
-/// Она удобна, но при похожих названиях групп может дать "не ту" группу.
-/// Поэтому в show_schedule выше мы логируем результат выбора.
-fn pick_group_and_subgroup_with_preference(
-    available: &[GroupWithSubgroupsIds],
-    group_name: &str,
-    subgroup_name: Option<&str>,
-) -> Option<(String, String)> {
-    if available.is_empty() {
-        // warn не ставим — это может быть валидный ответ API (например, факультет без групп).
-        return None;
-    }
-
-    let needle = normalize_group_key(group_name);
-    let subgroup_needle = subgroup_name.map(normalize_group_key);
-
-    let exact_matches: Vec<&GroupWithSubgroupsIds> = available
-        .iter()
-        .filter(|g| normalize_group_key(&g.group_id) == needle)
-        .collect();
-    if exact_matches.len() == 1 {
-        let selected = exact_matches[0].clone();
-        let subgroup = pick_subgroup_with_preference(&selected, &needle, subgroup_needle.as_deref())?;
-        return Some((selected.group_id.clone(), subgroup));
-    }
-    if exact_matches.len() > 1 {
-        return None;
-    }
-
-    let contains_matches: Vec<&GroupWithSubgroupsIds> = available
-        .iter()
-        .filter(|g| normalize_group_key(&g.group_id).contains(&needle))
-        .collect();
-    if contains_matches.len() == 1 {
-        let selected = contains_matches[0].clone();
-        let subgroup = pick_subgroup_with_preference(&selected, &needle, subgroup_needle.as_deref())?;
-        return Some((selected.group_id.clone(), subgroup));
-    }
-
-    if let Some(subgroup_needle) = subgroup_needle.as_deref() {
-        let mut subgroup_hit: Option<(String, String)> = None;
-        for group in available {
-            for subgroup in &group.subgroup_ids {
-                if normalize_group_key(subgroup) == subgroup_needle {
-                    if subgroup_hit.is_some() {
-                        return None;
-                    }
-                    subgroup_hit = Some((group.group_id.clone(), subgroup.clone()));
-                }
-            }
-        }
-        if let Some(pair) = subgroup_hit {
-            return Some(pair);
-        }
-
-        let mut subgroup_contains: Option<(String, String)> = None;
-        for group in available {
-            for subgroup in &group.subgroup_ids {
-                if normalize_group_key(subgroup).contains(subgroup_needle) {
-                    if subgroup_contains.is_some() {
-                        return None;
-                    }
-                    subgroup_contains = Some((group.group_id.clone(), subgroup.clone()));
-                }
-            }
-        }
-        if let Some(pair) = subgroup_contains {
-            return Some(pair);
-        }
-    }
-
-    None
-}
-
-/// Форматирование расписания в текст Telegram.
-///
-/// Почему сортировка здесь:
-/// - API может вернуть занятия неотсортированными
-/// - пользователю нужен человекочитаемый порядок по времени
-fn format_schedule_message(
+/// Форматирование расписания на дату.
+fn format_schedule_message_for_date(
     group_id: &str,
     subgroup_id: &str,
     mut lessons: Vec<LessonResponse>,
-    weekday: &str,
+    date: NaiveDate,
 ) -> String {
-    lessons.sort_by(|a, b| a.start_time.cmp(&b.start_time));
+    lessons.sort_by_key(lesson_time_key);
 
     let header = if subgroup_id.is_empty() {
-        format!("📅 Расписание на {weekday}\nГруппа: {group_id}\n")
+        format!(
+            "📅 Расписание на {} ({})\nГруппа: {}\n",
+            format_display_date(date),
+            weekday_ru_full(date.weekday()),
+            group_id
+        )
     } else {
         format!(
-            "📅 Расписание на {weekday}\nГруппа: {group_id}\nПодгруппа: {subgroup_id}\n"
+            "📅 Расписание на {} ({})\nГруппа: {}\nПодгруппа: {}\n",
+            format_display_date(date),
+            weekday_ru_full(date.weekday()),
+            group_id,
+            subgroup_id
         )
     };
 
@@ -310,30 +485,29 @@ fn format_schedule_message(
 
     let mut lines = Vec::new();
     for (index, lesson) in lessons.iter().enumerate() {
-        // Сборка строки максимально "бережно":
-        // - trim у названия
-        // - type и auditorium добавляем только если они заданы и не пустые
-        let mut line = format!(
-            "{}. {}-{} — {}",
-            index + 1,
-            lesson.start_time,
-            lesson.end_time,
-            lesson.name.trim()
-        );
+        let time = format_lesson_time(lesson);
+        let name = lesson
+            .name
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .unwrap_or("Без названия");
 
-        if let Some(lesson_type) = lesson.lesson_type.as_ref() {
-            if !lesson_type.is_empty() {
-                line.push_str(" (");
-                line.push_str(lesson_type);
-                line.push(')');
-            }
+        let mut line = format!("{}. {} — {}", index + 1, time, name);
+
+        if let Some(lesson_type) = lesson.lesson_type.as_ref().map(|v| v.trim())
+            && !lesson_type.is_empty()
+        {
+            line.push_str(" (");
+            line.push_str(lesson_type);
+            line.push(')');
         }
 
-        if let Some(auditorium) = lesson.auditorium.as_ref() {
-            if !auditorium.is_empty() {
-                line.push_str(" — ");
-                line.push_str(auditorium);
-            }
+        if let Some(auditorium) = lesson.auditorium.as_ref().map(|v| v.trim())
+            && !auditorium.is_empty()
+        {
+            line.push_str(" — ");
+            line.push_str(auditorium);
         }
 
         if let Some(teacher) = lesson.teacher.as_ref() {
@@ -348,6 +522,204 @@ fn format_schedule_message(
     }
 
     format!("{header}\n{}", lines.join("\n"))
+}
+
+/// Форматирование расписания за неделю.
+fn format_schedule_message_for_week(
+    group_id: &str,
+    subgroup_id: &str,
+    lessons: Vec<LessonResponse>,
+    start: NaiveDate,
+    end: NaiveDate,
+) -> String {
+    let header = if subgroup_id.is_empty() {
+        format!(
+            "📅 Расписание на неделю\n{} - {}\nГруппа: {}\n",
+            format_display_date(start),
+            format_display_date(end),
+            group_id
+        )
+    } else {
+        format!(
+            "📅 Расписание на неделю\n{} - {}\nГруппа: {}\nПодгруппа: {}\n",
+            format_display_date(start),
+            format_display_date(end),
+            group_id,
+            subgroup_id
+        )
+    };
+
+    if lessons.is_empty() {
+        return format!("{header}\nПар нет 🎉");
+    }
+
+    let mut items: Vec<LessonWithDate> = lessons
+        .into_iter()
+        .map(|lesson| {
+            let (date_value, label) = lesson_date_label(&lesson);
+            LessonWithDate {
+                date: date_value,
+                label,
+                lesson,
+            }
+        })
+        .collect();
+
+    items.sort_by(|a, b| {
+        let date_cmp = match (&a.date, &b.date) {
+            (Some(a_date), Some(b_date)) => a_date.cmp(b_date),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.label.cmp(&b.label),
+        };
+
+        if date_cmp != std::cmp::Ordering::Equal {
+            return date_cmp;
+        }
+
+        lesson_time_key(&a.lesson).cmp(&lesson_time_key(&b.lesson))
+    });
+
+    let mut lines = Vec::new();
+    let mut current_label: Option<String> = None;
+
+    for (index, item) in items.iter().enumerate() {
+        if current_label.as_deref() != Some(&item.label) {
+            if index > 0 {
+                lines.push(String::new());
+            }
+            lines.push(item.label.clone());
+            current_label = Some(item.label.clone());
+        }
+
+        let time = format_lesson_time(&item.lesson);
+        let name = item
+            .lesson
+            .name
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .unwrap_or("Без названия");
+
+        let mut line = format!("- {} — {}", time, name);
+
+        if let Some(lesson_type) = item.lesson.lesson_type.as_ref().map(|v| v.trim())
+            && !lesson_type.is_empty()
+        {
+            line.push_str(" (");
+            line.push_str(lesson_type);
+            line.push(')');
+        }
+
+        if let Some(auditorium) = item.lesson.auditorium.as_ref().map(|v| v.trim())
+            && !auditorium.is_empty()
+        {
+            line.push_str(" — ");
+            line.push_str(auditorium);
+        }
+
+        if let Some(teacher) = item.lesson.teacher.as_ref() {
+            let name = teacher_display_name(teacher);
+            if !name.is_empty() {
+                line.push_str(" — ");
+                line.push_str(&name);
+            }
+        }
+
+        lines.push(line);
+    }
+
+    format!("{header}\n{}", lines.join("\n"))
+}
+
+struct LessonWithDate {
+    date: Option<NaiveDate>,
+    label: String,
+    lesson: LessonResponse,
+}
+
+fn lesson_date_label(lesson: &LessonResponse) -> (Option<NaiveDate>, String) {
+    if let Some(raw) = lesson.date.as_deref() {
+        let raw = raw.trim();
+        if !raw.is_empty() {
+            if let Some(date) = parse_lesson_date(raw) {
+                let label = format!(
+                    "{} ({})",
+                    format_display_date(date),
+                    weekday_ru_short(date.weekday())
+                );
+                return (Some(date), label);
+            }
+            return (None, raw.to_string());
+        }
+    }
+
+    (None, "Без даты".to_string())
+}
+
+fn parse_lesson_date(raw: &str) -> Option<NaiveDate> {
+    NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+        .or_else(|_| NaiveDate::parse_from_str(raw, "%d.%m.%Y"))
+        .or_else(|_| NaiveDate::parse_from_str(raw, "%d/%m/%Y"))
+        .or_else(|_| NaiveDate::parse_from_str(raw, "%d.%m.%y"))
+        .or_else(|_| NaiveDate::parse_from_str(raw, "%d/%m/%y"))
+        .ok()
+        .or_else(|| parse_russian_date(raw))
+}
+
+fn parse_russian_date(raw: &str) -> Option<NaiveDate> {
+    let parts: Vec<&str> = raw.split_whitespace().collect();
+    if parts.len() < 3 {
+        return None;
+    }
+
+    let day_str = parts[0].trim_matches(|c: char| !c.is_ascii_digit());
+    let mut month_str = parts[1].to_lowercase();
+    month_str.retain(|c| c.is_alphabetic() || c == 'ё');
+    let year_str = parts[2].trim_matches(|c: char| !c.is_ascii_digit());
+
+    let day: u32 = day_str.parse().ok()?;
+    let year: i32 = year_str.parse().ok()?;
+    let month = match month_str.as_str() {
+        "января" => 1,
+        "февраля" => 2,
+        "марта" => 3,
+        "апреля" => 4,
+        "мая" => 5,
+        "июня" => 6,
+        "июля" => 7,
+        "августа" => 8,
+        "сентября" => 9,
+        "октября" => 10,
+        "ноября" => 11,
+        "декабря" => 12,
+        _ => return None,
+    };
+
+    NaiveDate::from_ymd_opt(year, month, day)
+}
+
+fn format_lesson_time(lesson: &LessonResponse) -> String {
+    let start = lesson.start_time.as_deref().map(str::trim).unwrap_or("");
+    let end = lesson.end_time.as_deref().map(str::trim).unwrap_or("");
+
+    if !start.is_empty() && !end.is_empty() {
+        return format!("{}-{}", start, end);
+    }
+
+    if !start.is_empty() {
+        return start.to_string();
+    }
+
+    if !end.is_empty() {
+        return end.to_string();
+    }
+
+    "Время не указано".to_string()
+}
+
+fn lesson_time_key(lesson: &LessonResponse) -> String {
+    lesson.start_time.as_deref().unwrap_or("99:99").to_string()
 }
 
 fn teacher_display_name(teacher: &TeacherResponse) -> String {
@@ -386,14 +758,31 @@ fn teacher_display_name(teacher: &TeacherResponse) -> String {
     parts.join(" ")
 }
 
-/// Текущий день недели на русском.
-///
-/// Это прикладная функция для UI/параметров API.
-/// Если API ожидает другой формат (например, "MONDAY"), это место нужно будет менять.
-fn current_weekday_ru(offset_seconds: i32) -> &'static str {
-    let offset = FixedOffset::east_opt(offset_seconds)
-        .unwrap_or_else(|| FixedOffset::east_opt(0).unwrap());
-    match Utc::now().with_timezone(&offset).weekday() {
+fn current_date(offset_seconds: i32) -> NaiveDate {
+    let offset =
+        FixedOffset::east_opt(offset_seconds).unwrap_or_else(|| FixedOffset::east_opt(0).unwrap());
+    Utc::now().with_timezone(&offset).date_naive()
+}
+
+fn week_start_date(date: NaiveDate) -> NaiveDate {
+    let weekday = date.weekday().num_days_from_monday() as i64;
+    date - Duration::days(weekday)
+}
+
+fn format_display_date(date: NaiveDate) -> String {
+    date.format("%d.%m.%Y").to_string()
+}
+
+fn format_display_date_short(date: NaiveDate) -> String {
+    date.format("%d.%m").to_string()
+}
+
+fn format_api_date(date: NaiveDate) -> String {
+    date.format("%Y-%m-%d").to_string()
+}
+
+fn weekday_ru_full(weekday: chrono::Weekday) -> &'static str {
+    match weekday {
         chrono::Weekday::Mon => "Понедельник",
         chrono::Weekday::Tue => "Вторник",
         chrono::Weekday::Wed => "Среда",
@@ -402,6 +791,99 @@ fn current_weekday_ru(offset_seconds: i32) -> &'static str {
         chrono::Weekday::Sat => "Суббота",
         chrono::Weekday::Sun => "Воскресенье",
     }
+}
+
+fn weekday_ru_short(weekday: chrono::Weekday) -> &'static str {
+    match weekday {
+        chrono::Weekday::Mon => "Пн",
+        chrono::Weekday::Tue => "Вт",
+        chrono::Weekday::Wed => "Ср",
+        chrono::Weekday::Thu => "Чт",
+        chrono::Weekday::Fri => "Пт",
+        chrono::Weekday::Sat => "Сб",
+        chrono::Weekday::Sun => "Вс",
+    }
+}
+
+/// Подбор пары (group_id, subgroup_id) на основании:
+/// - списка доступных групп от внешнего API
+/// - `group_name`, который хранится у студента
+///
+/// Важный момент:
+/// подбор идёт по `contains` на lower-case строках → это эвристика.
+/// Она удобна, но при похожих названиях групп может дать "не ту" группу.
+/// Поэтому в show_schedule выше мы логируем результат выбора.
+fn pick_group_and_subgroup_with_preference(
+    available: &[GroupWithSubgroupsIds],
+    group_name: &str,
+    subgroup_name: Option<&str>,
+) -> Option<(String, String)> {
+    if available.is_empty() {
+        // warn не ставим — это может быть валидный ответ API (например, факультет без групп).
+        return None;
+    }
+
+    let needle = normalize_group_key(group_name);
+    let subgroup_needle = subgroup_name.map(normalize_group_key);
+
+    let exact_matches: Vec<&GroupWithSubgroupsIds> = available
+        .iter()
+        .filter(|g| normalize_group_key(&g.group_id) == needle)
+        .collect();
+    if exact_matches.len() == 1 {
+        let selected = exact_matches[0].clone();
+        let subgroup =
+            pick_subgroup_with_preference(&selected, &needle, subgroup_needle.as_deref())?;
+        return Some((selected.group_id.clone(), subgroup));
+    }
+    if exact_matches.len() > 1 {
+        return None;
+    }
+
+    let contains_matches: Vec<&GroupWithSubgroupsIds> = available
+        .iter()
+        .filter(|g| normalize_group_key(&g.group_id).contains(&needle))
+        .collect();
+    if contains_matches.len() == 1 {
+        let selected = contains_matches[0].clone();
+        let subgroup =
+            pick_subgroup_with_preference(&selected, &needle, subgroup_needle.as_deref())?;
+        return Some((selected.group_id.clone(), subgroup));
+    }
+
+    if let Some(subgroup_needle) = subgroup_needle.as_deref() {
+        let mut subgroup_hit: Option<(String, String)> = None;
+        for group in available {
+            for subgroup in &group.subgroup_ids {
+                if normalize_group_key(subgroup) == subgroup_needle {
+                    if subgroup_hit.is_some() {
+                        return None;
+                    }
+                    subgroup_hit = Some((group.group_id.clone(), subgroup.clone()));
+                }
+            }
+        }
+        if let Some(pair) = subgroup_hit {
+            return Some(pair);
+        }
+
+        let mut subgroup_contains: Option<(String, String)> = None;
+        for group in available {
+            for subgroup in &group.subgroup_ids {
+                if normalize_group_key(subgroup).contains(subgroup_needle) {
+                    if subgroup_contains.is_some() {
+                        return None;
+                    }
+                    subgroup_contains = Some((group.group_id.clone(), subgroup.clone()));
+                }
+            }
+        }
+        if let Some(pair) = subgroup_contains {
+            return Some(pair);
+        }
+    }
+
+    None
 }
 
 fn normalize_group_key(value: &str) -> String {
@@ -429,8 +911,8 @@ pub fn filter_groups_by_course(
 
     let mut filtered: Vec<GroupWithSubgroupsIds> = available
         .iter()
-        .cloned()
         .filter(|g| group_year_prefix(&g.group_id) == Some(expected))
+        .cloned()
         .collect();
 
     if filtered.is_empty() {
@@ -442,7 +924,10 @@ pub fn filter_groups_by_course(
 }
 
 fn group_year_prefix(group_id: &str) -> Option<i32> {
-    let digits: String = group_id.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let digits: String = group_id
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
     if digits.len() >= 2 {
         digits[..2].parse::<i32>().ok()
     } else {
@@ -518,21 +1003,11 @@ fn pick_subgroup_with_preference(
 ///
 /// Почему нужна:
 /// - в БД/регистрации факультет может храниться как "Факультет математики и ...",
-///   а API ждёт короткое "ФМиИТ".
-///
-/// Возвращаем Option:
-/// - Some("ФМиИТ") если уверенно распознали
-/// - None если факультет неизвестный → выше есть явная обработка
-pub(crate) fn normalize_faculty(value: &str) -> Option<&'static str> {
-    let normalized = value.to_lowercase();
-
-    // "распознавание по подстрокам" — эвристика для пользовательских/разноформатных данных.
-    if normalized.contains("математики") && normalized.contains("информационных") {
+/// - внешнее API ждёт короткие значения.
+pub fn normalize_faculty(value: &str) -> Option<&'static str> {
+    let v = value.trim().to_lowercase();
+    if v.contains("фмиит") || v.contains("матем") {
         return Some("ФМиИТ");
     }
-    if normalized == "фмиит" {
-        return Some("ФМиИТ");
-    }
-
     None
 }

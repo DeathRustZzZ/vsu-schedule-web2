@@ -5,13 +5,13 @@
 // router    — маршрутизация апдейтов (commands, messages, callbacks)
 // ui        — текстовые ответы и форматирование сообщений
 pub mod callbacks;
+pub mod error_handler;
+pub mod flows;
+pub mod handlers;
 pub mod keyboards;
 pub mod router;
 pub mod schedule_api;
 pub mod ui;
-pub mod error_handler;
-pub mod handlers;
-pub mod flows;
 
 use crate::db::facade::DbFacade;
 use sqlx::PgPool;

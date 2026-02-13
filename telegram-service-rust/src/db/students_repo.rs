@@ -1,6 +1,7 @@
-use sqlx::{PgPool, Postgres};
-use log::{info, debug, error};
+use crate::db::facade::RegistrationParams;
 use crate::domain::student::Student;
+use log::{debug, error, info};
+use sqlx::{PgPool, Postgres};
 
 pub async fn find_by_telegram_id(
     pool: &PgPool,
@@ -48,16 +49,20 @@ pub async fn find_by_telegram_id(
 pub async fn insert<'a, E>(
     executor: E,
     telegram_id: i64,
-    faculty: &str,
-    group_name: &str,
-    subgroup_name: Option<&str>,
-    study_form: &str,
-    course: Option<&str>,
-    username: Option<&str>,
+    params: RegistrationParams<'_>,
 ) -> anyhow::Result<Student>
 where
     E: sqlx::Executor<'a, Database = Postgres>,
 {
+    let RegistrationParams {
+        faculty,
+        group_name,
+        subgroup_name,
+        study_form,
+        course,
+        username,
+    } = params;
+
     info!(
         "Регистрация студента: telegram_id={}, faculty={}, group={}, study_form={}, course={:?}, has_username={}",
         mask_telegram_id(telegram_id),
@@ -95,7 +100,10 @@ where
 
     match res {
         Ok(student) => {
-            info!("Студент успешно сохранён: id={}, telegram_id={}", student.id, student.telegram_id);
+            info!(
+                "Студент успешно сохранён: id={}, telegram_id={}",
+                student.id, student.telegram_id
+            );
             Ok(student)
         }
         Err(e) => {

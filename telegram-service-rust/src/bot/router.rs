@@ -39,9 +39,7 @@ pub async fn run(
                     crate::bot::error_handler::handle_message_safe(
                         bot.clone(),
                         msg.clone(),
-                        |b, m| async move {
-                            message::handle_message(b, m, db, schedule_api).await
-                        },
+                        |b, m| async move { message::handle_message(b, m, db, schedule_api).await },
                     )
                     .await
                 }
@@ -51,7 +49,6 @@ pub async fn run(
         .branch(Update::filter_callback_query().endpoint({
             let db = Arc::clone(&db);
             let schedule_api = Arc::clone(&schedule_api);
-            let schedule_tz_offset_seconds = schedule_tz_offset_seconds;
             move |bot: Bot, q: CallbackQuery| {
                 let db = Arc::clone(&db);
                 let schedule_api = Arc::clone(&schedule_api);

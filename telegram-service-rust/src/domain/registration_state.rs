@@ -18,13 +18,21 @@ impl RegistrationState {
         }
     }
 
-    pub fn from_str(state: &str) -> Self {
-        match state {
+    pub fn parse_or_idle(state: &str) -> Self {
+        <Self as std::str::FromStr>::from_str(state).unwrap_or(Self::Idle)
+    }
+}
+
+impl std::str::FromStr for RegistrationState {
+    type Err = ();
+
+    fn from_str(state: &str) -> Result<Self, Self::Err> {
+        Ok(match state {
             "await_faculty" => RegistrationState::AwaitingFaculty,
             "await_study_form" => RegistrationState::AwaitingStudyForm,
             "await_course" => RegistrationState::AwaitingCourse,
             "await_group" => RegistrationState::AwaitingGroup,
-            _ => RegistrationState::Idle,
-        }
+            _ => return Err(()),
+        })
     }
 }

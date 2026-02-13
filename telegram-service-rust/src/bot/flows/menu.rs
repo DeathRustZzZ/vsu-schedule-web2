@@ -47,8 +47,7 @@ pub async fn show_help(
 ) -> Result<(), teloxide::RequestError> {
     debug!("show_help: user={} chat_id={}", telegram_id, chat_id.0);
 
-    let text =
-        "ℹ️ Справка\n\nДоступные команды:\n/start — главное меню\n/register — регистрация\n/help — помощь";
+    let text = "ℹ️ Справка\n\nДоступные команды:\n/start — главное меню\n/register — регистрация\n/help — помощь";
     render_screen(
         bot,
         db,
@@ -84,7 +83,10 @@ pub async fn show_profile(
             )
         }
         Ok(None) => {
-            info!("profile requested but user {} is not registered", telegram_id);
+            info!(
+                "profile requested but user {} is not registered",
+                telegram_id
+            );
             "Профиль не найден. Сначала зарегистрируйся.".to_string()
         }
         Err(err) => {

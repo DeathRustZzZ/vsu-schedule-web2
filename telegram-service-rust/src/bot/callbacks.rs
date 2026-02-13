@@ -1,10 +1,7 @@
 use std::str::FromStr;
 
 use crate::domain::{
-    course::Course,
-    faculty::Faculty,
-    groups::mit::MitGroup,
-    study_form::StudyForm,
+    course::Course, faculty::Faculty, groups::mit::MitGroup, study_form::StudyForm,
 };
 
 /// UI-действия главного меню / навигации.
@@ -86,9 +83,7 @@ impl FromStr for Action {
             "menu_schedule" | "my_schedule" | "schedule" | "action:schedule" => {
                 Ok(Action::MySchedule)
             }
-            "menu_choose_group" | "choose_group" | "action:choose_group" => {
-                Ok(Action::ChooseGroup)
-            }
+            "menu_choose_group" | "choose_group" | "action:choose_group" => Ok(Action::ChooseGroup),
             "menu_help" | "help" | "action:help" => Ok(Action::Help),
             "menu_back" | "back" | "action:back" => Ok(Action::Back),
 
@@ -120,7 +115,19 @@ pub enum Callback {
     Course(Course),
     MitGroup(MitGroup),
     GroupId(String),
-    SubgroupChoice { group_id: String, subgroup_id: String },
+    SubgroupChoice {
+        group_id: String,
+        subgroup_id: String,
+    },
+    ScheduleMenu,
+    ScheduleDate(String),
+    ScheduleWeek {
+        start: String,
+        end: String,
+    },
+    SchedulePicker {
+        start: String,
+    },
 }
 
 impl FromStr for Callback {
@@ -165,6 +172,24 @@ impl FromStr for Callback {
             return Ok(Callback::SubgroupChoice {
                 group_id: String::new(),
                 subgroup_id: rest.to_string(),
+            });
+        }
+        if s == "schedule:menu" {
+            return Ok(Callback::ScheduleMenu);
+        }
+        if let Some(rest) = s.strip_prefix("schedule:date:") {
+            return Ok(Callback::ScheduleDate(rest.to_string()));
+        }
+        if let Some(rest) = s.strip_prefix("schedule:week:") {
+            let (start, end) = rest
+                .split_once('|')
+                .map(|(a, b)| (a.to_string(), b.to_string()))
+                .unwrap_or_else(|| (rest.to_string(), String::new()));
+            return Ok(Callback::ScheduleWeek { start, end });
+        }
+        if let Some(rest) = s.strip_prefix("schedule:picker:") {
+            return Ok(Callback::SchedulePicker {
+                start: rest.to_string(),
             });
         }
         if let Ok(group) = MitGroup::from_str(s) {

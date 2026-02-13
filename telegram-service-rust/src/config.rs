@@ -61,23 +61,23 @@ impl AppConfig {
         // Используем expect, потому что:
         //  - без токена приложение бесполезно
         //  - ошибка конфигурации должна быть обнаружена сразу
-        let bot_token = env::var("BOT_TOKEN")
-            .expect("environment variable BOT_TOKEN is not set");
+        let bot_token = env::var("BOT_TOKEN").expect("environment variable BOT_TOKEN is not set");
         log::debug!("BOT_TOKEN successfully loaded");
 
         // Загрузка строки подключения к базе данных.
         //
         // Аналогично BOT_TOKEN — это обязательный параметр.
-        let database_url = env::var("DATABASE_URL")
-            .expect("environment variable DATABASE_URL is not set");
+        let database_url =
+            env::var("DATABASE_URL").expect("environment variable DATABASE_URL is not set");
         log::debug!("DATABASE_URL successfully loaded");
 
         let schedule_api_base =
             env::var("SCHEDULE_API_BASE").unwrap_or_else(|_| "http://api-gateway:8765".to_string());
         log::debug!("SCHEDULE_API_BASE successfully loaded");
 
-        let schedule_tz_offset_seconds =
-            parse_timezone_offset(&env::var("SCHEDULE_TZ_OFFSET").unwrap_or_else(|_| "+03:00".to_string()));
+        let schedule_tz_offset_seconds = parse_timezone_offset(
+            &env::var("SCHEDULE_TZ_OFFSET").unwrap_or_else(|_| "+03:00".to_string()),
+        );
         log::debug!("SCHEDULE_TZ_OFFSET successfully loaded");
 
         log::info!("application configuration loaded successfully");

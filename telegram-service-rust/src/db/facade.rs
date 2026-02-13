@@ -1,11 +1,25 @@
+use anyhow;
 use log::{debug, error, info, warn};
 use sqlx::PgPool;
-use anyhow;
 
 use crate::db::{students_repo, user_states_repo};
 use crate::domain::registration_state::RegistrationState;
 use crate::domain::student::Student;
 use crate::domain::user_state::UserState;
+
+pub struct RegistrationParams<'a> {
+    pub faculty: &'a str,
+    pub group_name: &'a str,
+    pub subgroup_name: Option<&'a str>,
+    pub study_form: &'a str,
+    pub course: Option<&'a str>,
+    pub username: Option<&'a str>,
+}
+
+pub struct RegistrationAtomicParams<'a> {
+    pub expected_state: RegistrationState,
+    pub data: RegistrationParams<'a>,
+}
 
 /// Facade над DB-слоем.
 ///
@@ -39,21 +53,31 @@ impl DbFacade {
     /// - ошибки не логируем здесь насильно: пусть решает вызывающая сторона
     ///   (иногда `Err` — это важный сигнал, иногда его намеренно "глушат").
     pub async fn find_student(&self, telegram_id: i64) -> anyhow::Result<Option<Student>> {
-        debug!("DB: find_student telegram_id={}", mask_telegram_id(telegram_id));
+        debug!(
+            "DB: find_student telegram_id={}",
+            mask_telegram_id(telegram_id)
+        );
         students_repo::find_by_telegram_id(&self.pool, telegram_id).await
     }
 
     pub async fn complete_registration_atomic(
         &self,
         telegram_id: i64,
-        expected_state: RegistrationState,
-        faculty: &str,
-        group_name: &str,
-        subgroup_name: Option<&str>,
-        study_form: &str,
-        course: Option<&str>,
-        username: Option<&str>,
+        params: RegistrationAtomicParams<'_>,
     ) -> anyhow::Result<Student> {
+        let RegistrationAtomicParams {
+            expected_state,
+            data,
+        } = params;
+        let RegistrationParams {
+            faculty,
+            group_name,
+            subgroup_name,
+            study_form,
+            course,
+            username,
+        } = data;
+
         info!(
             "DB: atomic registration telegram_id={} expected_state={}",
             mask_telegram_id(telegram_id),
@@ -100,14 +124,16 @@ impl DbFacade {
         let student = students_repo::insert(
             &mut *tx,
             telegram_id,
-            faculty,
-            group_name,
-            subgroup_name,
-            study_form,
-            course,
-            username,
+            RegistrationParams {
+                faculty,
+                group_name,
+                subgroup_name,
+                study_form,
+                course,
+                username,
+            },
         )
-            .await?;
+        .await?;
 
         // Сбрасываем состояние
         sqlx::query(
@@ -127,8 +153,7 @@ impl DbFacade {
 
         Ok(student)
     }
-    
-    
+
     /// Зарегистрировать/сохранить студента.
     ///
     /// Это ключевая точка:
@@ -141,13 +166,17 @@ impl DbFacade {
     pub async fn register_student(
         &self,
         telegram_id: i64,
-        faculty: &str,
-        group: &str,
-        subgroup: Option<&str>,
-        study_form: &str,
-        course: Option<&str>,
-        username: Option<&str>,
+        params: RegistrationParams<'_>,
     ) -> anyhow::Result<Student> {
+        let RegistrationParams {
+            faculty,
+            group_name: group,
+            subgroup_name: subgroup,
+            study_form,
+            course,
+            username,
+        } = params;
+
         info!(
             "DB: register_student telegram_id={}, faculty='{}', group='{}', subgroup={:?}, study_form='{}', course={:?}, has_username={}",
             mask_telegram_id(telegram_id),
@@ -162,14 +191,16 @@ impl DbFacade {
         match students_repo::insert(
             &self.pool,
             telegram_id,
-            faculty,
-            group,
-            subgroup,
-            study_form,
-            course,
-            username,
+            RegistrationParams {
+                faculty,
+                group_name: group,
+                subgroup_name: subgroup,
+                study_form,
+                course,
+                username,
+            },
         )
-            .await
+        .await
         {
             Ok(student) => {
                 debug!(
@@ -196,7 +227,10 @@ impl DbFacade {
     /// Это "оперативное" состояние, которое помогает боту помнить,
     /// на каком шаге находится пользователь.
     pub async fn get_user_state(&self, telegram_id: i64) -> anyhow::Result<Option<UserState>> {
-        debug!("DB: get_user_state telegram_id={}", mask_telegram_id(telegram_id));
+        debug!(
+            "DB: get_user_state telegram_id={}",
+            mask_telegram_id(telegram_id)
+        );
         user_states_repo::find_by_telegram_id(&self.pool, telegram_id).await
     }
 
@@ -294,7 +328,10 @@ impl DbFacade {
     /// Если записан только chat_id или только message_id — считаем UI message неконсистентным
     /// и возвращаем None (fallback на отправку нового сообщения выше по стеку).
     pub async fn get_ui_message(&self, telegram_id: i64) -> anyhow::Result<Option<(i64, i32)>> {
-        debug!("DB: get_ui_message telegram_id={}", mask_telegram_id(telegram_id));
+        debug!(
+            "DB: get_ui_message telegram_id={}",
+            mask_telegram_id(telegram_id)
+        );
 
         let state = self.get_user_state(telegram_id).await?;
 

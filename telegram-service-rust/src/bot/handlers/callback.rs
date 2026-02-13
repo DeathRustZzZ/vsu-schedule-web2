@@ -7,13 +7,48 @@ use teloxide::types::MessageId;
 
 use crate::bot::callbacks::{Action, Callback};
 use crate::bot::flows::menu::{show_help, show_main_menu, show_profile};
-use crate::bot::flows::registration::{complete_registration, start_registration};
-use crate::bot::flows::schedule::{filter_groups_by_course, normalize_faculty, show_schedule};
+use crate::bot::flows::registration::{
+    RegistrationContext, complete_registration, start_registration,
+};
+use crate::bot::flows::schedule::{
+    ScheduleFlowContext, filter_groups_by_course, normalize_faculty, show_date_picker,
+    show_schedule_for_date, show_schedule_for_week, show_schedule_menu,
+};
 use crate::bot::keyboards;
 use crate::bot::schedule_api::ScheduleApi;
 use crate::bot::ui::render_screen;
 use crate::db::facade::DbFacade;
 use crate::domain::registration_state::RegistrationState;
+use chrono::{Duration, NaiveDate};
+
+struct ActionContext<'a> {
+    bot: &'a Bot,
+    db: &'a DbFacade,
+    schedule_tz_offset_seconds: i32,
+    telegram_id: i64,
+    chat_id: ChatId,
+    message_id: Option<MessageId>,
+}
+
+impl<'a> ActionContext<'a> {
+    fn new(
+        bot: &'a Bot,
+        db: &'a DbFacade,
+        schedule_tz_offset_seconds: i32,
+        telegram_id: i64,
+        chat_id: ChatId,
+        message_id: Option<MessageId>,
+    ) -> Self {
+        Self {
+            bot,
+            db,
+            schedule_tz_offset_seconds,
+            telegram_id,
+            chat_id,
+            message_id,
+        }
+    }
+}
 
 /// Обработка callback_query (нажатия inline-кнопок).
 ///
@@ -58,7 +93,9 @@ pub async fn handle_callback(
 
     debug!(
         "callback context: user={} chat_id={} message_id={:?}",
-        telegram_id, chat_id.0, message_id.map(|m| m.0)
+        telegram_id,
+        chat_id.0,
+        message_id.map(|m| m.0)
     );
 
     let user_state = match db.get_user_state(telegram_id).await {
@@ -86,13 +123,14 @@ pub async fn handle_callback(
     match callback {
         Callback::Action(action) => {
             handle_action(
-                &bot,
-                db.as_ref(),
-                schedule_api.as_ref(),
-                schedule_tz_offset_seconds,
-                telegram_id,
-                chat_id,
-                message_id,
+                ActionContext::new(
+                    &bot,
+                    db.as_ref(),
+                    schedule_tz_offset_seconds,
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                ),
                 action,
             )
             .await?;
@@ -121,7 +159,10 @@ pub async fn handle_callback(
                 )
                 .await
             {
-                warn!("failed to update faculty for user {}: {:?}", telegram_id, err);
+                warn!(
+                    "failed to update faculty for user {}: {:?}",
+                    telegram_id, err
+                );
                 render_screen(
                     &bot,
                     db.as_ref(),
@@ -224,7 +265,10 @@ pub async fn handle_callback(
                 )
                 .await
             {
-                warn!("failed to update course for user {}: {:?}", telegram_id, err);
+                warn!(
+                    "failed to update course for user {}: {:?}",
+                    telegram_id, err
+                );
                 render_screen(
                     &bot,
                     db.as_ref(),
@@ -294,11 +338,7 @@ pub async fn handle_callback(
             }
             let username = q.from.username.clone();
             complete_registration(
-                &bot,
-                db.as_ref(),
-                telegram_id,
-                chat_id,
-                message_id,
+                RegistrationContext::new(&bot, db.as_ref(), telegram_id, chat_id, message_id),
                 group.title().to_string(),
                 None,
                 username,
@@ -377,13 +417,9 @@ pub async fn handle_callback(
                 .await?;
             } else {
                 let username = q.from.username.clone();
-                let subgroup = subgroup_ids.get(0).cloned();
+                let subgroup = subgroup_ids.first().cloned();
                 complete_registration(
-                    &bot,
-                    db.as_ref(),
-                    telegram_id,
-                    chat_id,
-                    message_id,
+                    RegistrationContext::new(&bot, db.as_ref(), telegram_id, chat_id, message_id),
                     group_id,
                     subgroup,
                     username,
@@ -391,7 +427,10 @@ pub async fn handle_callback(
                 .await?;
             }
         }
-        Callback::SubgroupChoice { group_id, subgroup_id } => {
+        Callback::SubgroupChoice {
+            group_id,
+            subgroup_id,
+        } => {
             if !is_expected_state(&user_state, RegistrationState::AwaitingGroup) {
                 render_screen(
                     &bot,
@@ -422,14 +461,102 @@ pub async fn handle_callback(
             }
             let username = q.from.username.clone();
             complete_registration(
-                &bot,
-                db.as_ref(),
-                telegram_id,
-                chat_id,
-                message_id,
+                RegistrationContext::new(&bot, db.as_ref(), telegram_id, chat_id, message_id),
                 group_id,
                 Some(subgroup_id),
                 username,
+            )
+            .await?;
+        }
+        Callback::ScheduleMenu => {
+            show_schedule_menu(
+                &bot,
+                db.as_ref(),
+                schedule_tz_offset_seconds,
+                telegram_id,
+                chat_id,
+                message_id,
+            )
+            .await?;
+        }
+        Callback::ScheduleDate(value) => match NaiveDate::parse_from_str(&value, "%Y-%m-%d") {
+            Ok(date) => {
+                show_schedule_for_date(
+                    ScheduleFlowContext::new(
+                        &bot,
+                        db.as_ref(),
+                        schedule_api.as_ref(),
+                        schedule_tz_offset_seconds,
+                        telegram_id,
+                        chat_id,
+                        message_id,
+                    ),
+                    date,
+                )
+                .await?;
+            }
+            Err(_) => {
+                render_screen(
+                    &bot,
+                    db.as_ref(),
+                    telegram_id,
+                    chat_id,
+                    message_id,
+                    "⚠️ Не удалось распознать дату. Попробуй выбрать ещё раз.",
+                    Some(keyboards::schedule_back_menu()),
+                )
+                .await?;
+            }
+        },
+        Callback::ScheduleWeek { start, end } => {
+            let start_date = NaiveDate::parse_from_str(&start, "%Y-%m-%d").ok();
+            let end_date = if end.trim().is_empty() {
+                start_date.map(|date| date + Duration::days(6))
+            } else {
+                NaiveDate::parse_from_str(&end, "%Y-%m-%d").ok()
+            };
+
+            match (start_date, end_date) {
+                (Some(start_date), Some(end_date)) if end_date >= start_date => {
+                    show_schedule_for_week(
+                        ScheduleFlowContext::new(
+                            &bot,
+                            db.as_ref(),
+                            schedule_api.as_ref(),
+                            schedule_tz_offset_seconds,
+                            telegram_id,
+                            chat_id,
+                            message_id,
+                        ),
+                        start_date,
+                        end_date,
+                    )
+                    .await?;
+                }
+                _ => {
+                    render_screen(
+                        &bot,
+                        db.as_ref(),
+                        telegram_id,
+                        chat_id,
+                        message_id,
+                        "⚠️ Не удалось распознать диапазон дат. Попробуй выбрать ещё раз.",
+                        Some(keyboards::schedule_back_menu()),
+                    )
+                    .await?;
+                }
+            }
+        }
+        Callback::SchedulePicker { start } => {
+            let parsed = NaiveDate::parse_from_str(&start, "%Y-%m-%d").ok();
+            show_date_picker(
+                &bot,
+                db.as_ref(),
+                schedule_tz_offset_seconds,
+                telegram_id,
+                chat_id,
+                message_id,
+                parsed,
             )
             .await?;
         }
@@ -445,18 +572,24 @@ pub async fn handle_callback(
 /// Здесь концентрируется UI-навигация, а доменные данные выбора (Faculty/Group/…) живут отдельно.
 /// Это снижает вероятность смешения "действий" и "данных".
 async fn handle_action(
-    bot: &Bot,
-    db: &DbFacade,
-    schedule_api: &ScheduleApi,
-    schedule_tz_offset_seconds: i32,
-    telegram_id: i64,
-    chat_id: ChatId,
-    message_id: Option<MessageId>,
+    ctx: ActionContext<'_>,
     action: Action,
 ) -> Result<(), teloxide::RequestError> {
+    let ActionContext {
+        bot,
+        db,
+        schedule_tz_offset_seconds,
+        telegram_id,
+        chat_id,
+        message_id,
+    } = ctx;
+
     debug!(
         "handle_action: user={} action={:?} chat_id={} message_id={:?}",
-        telegram_id, action, chat_id.0, message_id.map(|m| m.0)
+        telegram_id,
+        action,
+        chat_id.0,
+        message_id.map(|m| m.0)
     );
 
     match action {
@@ -470,11 +603,9 @@ async fn handle_action(
             show_profile(bot, db, telegram_id, chat_id, message_id).await?;
         }
         Action::MySchedule => {
-            // Schedule — внешняя интеграция → самое ценное место для логов.
-            show_schedule(
+            show_schedule_menu(
                 bot,
                 db,
-                schedule_api,
                 schedule_tz_offset_seconds,
                 telegram_id,
                 chat_id,
@@ -504,7 +635,7 @@ fn is_expected_state(
 ) -> bool {
     let state_value = state
         .as_ref()
-        .map(|s| RegistrationState::from_str(&s.state))
+        .map(|s| RegistrationState::parse_or_idle(&s.state))
         .unwrap_or(RegistrationState::Idle);
     state_value == expected
 }
