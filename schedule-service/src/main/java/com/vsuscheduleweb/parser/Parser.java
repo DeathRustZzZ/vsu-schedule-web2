@@ -14,6 +14,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -57,6 +58,9 @@ public class Parser {
     private List<Group> groups = new ArrayList<>();
     private List<Lesson> lessons = new ArrayList<>();
 
+    @Value("${schedule.parser.parse-all-sheets:false}")
+    private boolean parseAllSheets;
+
     public List<Teacher> getTeachers() {
         for (Teacher teacher : teachers) {
             teacher.getLessons().removeIf(lesson -> lesson.getName().equals(""));
@@ -79,32 +83,114 @@ public class Parser {
     }
 
     public void parse(File xlsxFile, String faculty) throws ParserException {
-        groups = new ArrayList<>();
-        teachers = new ArrayList<>();
-        lessons = new ArrayList<>();
+        List<Group> allGroups = new ArrayList<>();
+        List<Lesson> allLessons = new ArrayList<>();
+        List<Teacher> allTeachers = new ArrayList<>();
+        Map<String, Group> groupIndex = new HashMap<>();
+        Map<String, Subgroup> subgroupIndex = new HashMap<>();
 
         Workbook wb = readWorkbook(xlsxFile);
         try {
-            Sheet sheet = wb.getSheetAt(0);
-            SheetGrid grid = new SheetGrid(sheet);
-
-            try {
-                Header header = Header.detect(grid);
-                ParseContext context = buildGroups(header, grid, faculty);
-                parseLessons(header, grid, context);
-            } catch (ParserException ex) {
-                ExamHeader examHeader = ExamHeader.detect(grid);
-                if (examHeader == null) {
-                    throw ex;
+            boolean anyParsed = false;
+            ParserException lastError = null;
+            int totalSheets = wb.getNumberOfSheets();
+            int sheetLimit = parseAllSheets ? totalSheets : Math.min(totalSheets, 1);
+            for (int i = 0; i < sheetLimit; i++) {
+                Sheet sheet = wb.getSheetAt(i);
+                if (sheet == null) {
+                    continue;
                 }
-                ParseContext context = buildGroups(examHeader, grid, faculty);
-                parseExamLessons(examHeader, grid, context);
+
+                groups = new ArrayList<>();
+                teachers = new ArrayList<>();
+                lessons = new ArrayList<>();
+
+                SheetGrid grid = new SheetGrid(sheet);
+                try {
+                    Header header = Header.detect(grid);
+                    ParseContext context = buildGroups(header, grid, faculty);
+                    parseLessons(header, grid, context);
+                    anyParsed = true;
+                } catch (ParserException ex) {
+                    ExamHeader examHeader = ExamHeader.detect(grid);
+                    if (examHeader == null) {
+                        lastError = ex;
+                        log.warn("Skipping sheet {}: {}", sheet.getSheetName(), ex.getMessage());
+                        continue;
+                    }
+                    ParseContext context = buildGroups(examHeader, grid, faculty);
+                    parseExamLessons(examHeader, grid, context);
+                    anyParsed = true;
+                }
+
+                mergeGroups(groups, groupIndex, subgroupIndex, allGroups);
+                allLessons.addAll(lessons);
+                allTeachers.addAll(teachers);
+            }
+
+            if (!anyParsed) {
+                if (lastError != null) {
+                    throw lastError;
+                }
+                throw new ParserException("table format exception: no suitable sheets found");
             }
         } finally {
             try {
                 wb.close();
             } catch (Exception ignore) {
                 // close quietly
+            }
+        }
+
+        groups = allGroups;
+        lessons = allLessons;
+        teachers = allTeachers;
+    }
+
+    private void mergeGroups(List<Group> incoming,
+                             Map<String, Group> groupIndex,
+                             Map<String, Subgroup> subgroupIndex,
+                             List<Group> allGroups) {
+        for (Group group : incoming) {
+            String groupId = group.getId();
+            if (groupId == null || groupId.isBlank()) {
+                continue;
+            }
+            Group existing = groupIndex.get(groupId);
+            if (existing == null) {
+                groupIndex.put(groupId, group);
+                allGroups.add(group);
+                for (Subgroup subgroup : group.getSubgroups()) {
+                    String subgroupId = subgroup.getId();
+                    if (subgroupId != null && !subgroupId.isBlank()) {
+                        subgroupIndex.putIfAbsent(subgroupId, subgroup);
+                    }
+                }
+                continue;
+            }
+
+            if ((existing.getName() == null || existing.getName().isBlank())
+                    && group.getName() != null && !group.getName().isBlank()) {
+                existing.setName(group.getName());
+            }
+            if ((existing.getFaculty() == null || existing.getFaculty().isBlank())
+                    && group.getFaculty() != null && !group.getFaculty().isBlank()) {
+                existing.setFaculty(group.getFaculty());
+            }
+
+            existing.getCommonLessons().addAll(group.getCommonLessons());
+            for (Subgroup subgroup : group.getSubgroups()) {
+                String subgroupId = subgroup.getId();
+                if (subgroupId == null || subgroupId.isBlank()) {
+                    continue;
+                }
+                Subgroup existingSubgroup = subgroupIndex.get(subgroupId);
+                if (existingSubgroup == null) {
+                    subgroupIndex.put(subgroupId, subgroup);
+                    existing.getSubgroups().add(subgroup);
+                } else {
+                    existingSubgroup.getLessons().addAll(subgroup.getLessons());
+                }
             }
         }
     }

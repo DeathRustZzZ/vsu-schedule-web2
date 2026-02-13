@@ -485,40 +485,8 @@ fn format_schedule_message_for_date(
 
     let mut lines = Vec::new();
     for (index, lesson) in lessons.iter().enumerate() {
-        let time = format_lesson_time(lesson);
-        let name = lesson
-            .name
-            .as_deref()
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .unwrap_or("Без названия");
-
-        let mut line = format!("{}. {} — {}", index + 1, time, name);
-
-        if let Some(lesson_type) = lesson.lesson_type.as_ref().map(|v| v.trim())
-            && !lesson_type.is_empty()
-        {
-            line.push_str(" (");
-            line.push_str(lesson_type);
-            line.push(')');
-        }
-
-        if let Some(auditorium) = lesson.auditorium.as_ref().map(|v| v.trim())
-            && !auditorium.is_empty()
-        {
-            line.push_str(" — ");
-            line.push_str(auditorium);
-        }
-
-        if let Some(teacher) = lesson.teacher.as_ref() {
-            let name = teacher_display_name(teacher);
-            if !name.is_empty() {
-                line.push_str(" — ");
-                line.push_str(&name);
-            }
-        }
-
-        lines.push(line);
+        let prefix = format!("{}.", index + 1);
+        lines.extend(format_lesson_block(lesson, Some(&prefix)));
     }
 
     format!("{header}\n{}", lines.join("\n"))
@@ -592,44 +560,81 @@ fn format_schedule_message_for_week(
             current_label = Some(item.label.clone());
         }
 
-        let time = format_lesson_time(&item.lesson);
-        let name = item
-            .lesson
-            .name
-            .as_deref()
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .unwrap_or("Без названия");
-
-        let mut line = format!("- {} — {}", time, name);
-
-        if let Some(lesson_type) = item.lesson.lesson_type.as_ref().map(|v| v.trim())
-            && !lesson_type.is_empty()
-        {
-            line.push_str(" (");
-            line.push_str(lesson_type);
-            line.push(')');
-        }
-
-        if let Some(auditorium) = item.lesson.auditorium.as_ref().map(|v| v.trim())
-            && !auditorium.is_empty()
-        {
-            line.push_str(" — ");
-            line.push_str(auditorium);
-        }
-
-        if let Some(teacher) = item.lesson.teacher.as_ref() {
-            let name = teacher_display_name(teacher);
-            if !name.is_empty() {
-                line.push_str(" — ");
-                line.push_str(&name);
-            }
-        }
-
-        lines.push(line);
+        lines.extend(format_lesson_block(&item.lesson, None));
     }
 
     format!("{header}\n{}", lines.join("\n"))
+}
+
+fn format_lesson_block(lesson: &LessonResponse, prefix: Option<&str>) -> Vec<String> {
+    let time = format_lesson_time(lesson);
+    let name = lesson
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .unwrap_or("Без названия");
+
+    let time_cell = if time.chars().count() <= 11 {
+        format!("{:<11}", time)
+    } else {
+        time
+    };
+
+    let mut lines = Vec::new();
+
+    let mut time_line = String::new();
+    if let Some(prefix) = prefix {
+        time_line.push_str(prefix);
+        time_line.push(' ');
+    }
+    time_line.push_str("🕒 ");
+    time_line.push_str(&time_cell);
+    lines.push(time_line);
+
+    let mut name_line = String::from("📘 ");
+    name_line.push_str(name);
+
+    if let Some(lesson_type) = lesson.lesson_type.as_ref().map(|v| v.trim())
+        && !lesson_type.is_empty()
+    {
+        name_line.push_str(" (");
+        name_line.push_str(lesson_type);
+        name_line.push(')');
+    }
+    lines.push(name_line);
+
+    if let Some(auditorium) = lesson.auditorium.as_ref().map(|v| v.trim())
+        && !auditorium.is_empty()
+    {
+        let normalized = normalize_auditorium(auditorium);
+        lines.push(format!("🏫 ауд. {}", normalized));
+    }
+
+    if let Some(teacher) = lesson.teacher.as_ref() {
+        let name = teacher_display_name(teacher);
+        if !name.is_empty() {
+            lines.push(format!("👤 {}", name));
+        }
+    }
+
+    lines.push(String::new());
+    lines
+}
+
+fn normalize_auditorium(raw: &str) -> String {
+    let trimmed = raw.trim();
+    let lower = trimmed.to_lowercase();
+    if lower.starts_with("ауд.") {
+        return trimmed[4..].trim_start().to_string();
+    }
+    if lower.starts_with("ауд ") {
+        return trimmed[4..].trim_start().to_string();
+    }
+    if lower.starts_with("ауд:") {
+        return trimmed[4..].trim_start().to_string();
+    }
+    trimmed.to_string()
 }
 
 struct LessonWithDate {

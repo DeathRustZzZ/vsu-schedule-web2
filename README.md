@@ -35,6 +35,7 @@
 - Schedule Service: `http://localhost:9898`
 - PostgreSQL `schedule-db`: `localhost:5432`
 - PostgreSQL `students-db`: `localhost:5434`
+- Admin panel `http://localhost:9898/schedule/admin`
 
 ## Конфигурация
 - `compose-env.yaml` — docker-compose окружение.

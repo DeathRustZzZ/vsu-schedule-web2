@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,6 +27,7 @@ public class BotScheduleService {
     private final BotScheduleCacheService cacheService;
     private final LessonRepository lessonRepository;
     private final LessonMapper lessonMapper;
+    private static final long MAX_RANGE_DAYS = 7;
 
     public ListLessonResponse getSchedule(String faculty, String groupId, String subgroupId, String weekDay) {
         return cacheService
@@ -76,6 +78,10 @@ public class BotScheduleService {
             LocalDate tmp = startDate;
             startDate = endDate;
             endDate = tmp;
+        }
+        long days = ChronoUnit.DAYS.between(startDate, endDate) + 1;
+        if (days > MAX_RANGE_DAYS) {
+            endDate = startDate.plusDays(MAX_RANGE_DAYS - 1);
         }
 
         LocalDate finalStartDate = startDate;
